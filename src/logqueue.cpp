@@ -24,13 +24,13 @@ void LogQueue::run()
                 break;
             }
         }
-        std::unique_ptr<Log> log;
+        Log log;
         if(!m_logQueue.dequeue(log)) continue;
 
 
-        if (log && !log->data.isEmpty()) {
-            size_t to_write = log->data.size();
-            size_t written = fwrite(log->data.constData(), 1, to_write, logfile);
+        if (!log.data.isEmpty()) {
+            size_t to_write = log.data.size();
+            size_t written = fwrite(log.data.constData(), 1, to_write, logfile);
 
             if (written != to_write) {
                 qDebug() << "Log thread: Failed to write full log message to file.";
@@ -71,8 +71,8 @@ void LogQueue::print(const char* file, const char* func, int line, const char* f
     va_end(ap);
     QByteArray log_data = (prefix + log_content + "\n").toUtf8();
 
-    auto log = std::make_unique<Log>();
-    log->data = std::move(log_data);
+    Log log;
+    log.data = std::move(log_data);
 
-    m_logQueue.enqueue(std::move(log));
+    m_logQueue.enqueue(log);
 }

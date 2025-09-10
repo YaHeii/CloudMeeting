@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1217</width>
-    <height>818</height>
+    <height>952</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -174,8 +174,8 @@
               <rect>
                <x>0</x>
                <y>0</y>
-               <width>316</width>
-               <height>518</height>
+               <width>98</width>
+               <height>28</height>
               </rect>
              </property>
             </widget>
@@ -216,11 +216,7 @@
         </property>
         <layout class="QGridLayout" name="gridLayout">
          <item row="0" column="0">
-          <widget class="QLabel" name="mainshow_label">
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
+          <widget class="VideoWidget" name="widget_2" native="true"/>
          </item>
         </layout>
        </widget>
@@ -243,11 +239,17 @@
           </widget>
          </item>
          <item>
+          <widget class="QComboBox" name="videoDeviceComboBox"/>
+         </item>
+         <item>
           <widget class="QPushButton" name="openAudio">
            <property name="text">
             <string>开启音频</string>
            </property>
           </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="audioDevicecomboBox"/>
          </item>
         </layout>
        </widget>
@@ -302,6 +304,12 @@
    <class>MyTextEdit</class>
    <extends>QWidget</extends>
    <header>mytextedit.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>VideoWidget</class>
+   <extends>QWidget</extends>
+   <header>videowidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

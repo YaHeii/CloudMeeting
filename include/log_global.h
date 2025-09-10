@@ -12,7 +12,7 @@ struct Log
 };
 
 extern LogQueue* log_instance;
-
+//TODO:做多级错误日志处理
 #define WRITE_LOG(LOGTEXT, ...) do { \
 LogQueue::GetInstance().print(__FILE__, __FUNCTION__, __LINE__, LOGTEXT, ##__VA_ARGS__); \
 } while(0)

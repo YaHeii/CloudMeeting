@@ -1,0 +1,8 @@
+D:/code/C++/QT/CloudMeeting/out/build/x64-Debug/CMakeFiles/CloudMeeting.dir
+D:/code/C++/QT/CloudMeeting/out/build/x64-Debug/CMakeFiles/edit_cache.dir
+D:/code/C++/QT/CloudMeeting/out/build/x64-Debug/CMakeFiles/rebuild_cache.dir
+D:/code/C++/QT/CloudMeeting/out/build/x64-Debug/CMakeFiles/list_install_components.dir
+D:/code/C++/QT/CloudMeeting/out/build/x64-Debug/CMakeFiles/install.dir
+D:/code/C++/QT/CloudMeeting/out/build/x64-Debug/CMakeFiles/install/local.dir
+D:/code/C++/QT/CloudMeeting/out/build/x64-Debug/CMakeFiles/CloudMeeting_autogen_timestamp_deps.dir
+D:/code/C++/QT/CloudMeeting/out/build/x64-Debug/CMakeFiles/CloudMeeting_autogen.dir

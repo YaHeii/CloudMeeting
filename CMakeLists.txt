@@ -7,17 +7,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets)
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
+qt_standard_project_setup()
 
 set(FFMPEG_DIR ${CMAKE_SOURCE_DIR}/third_party/ffmpeg)
 
-qt_standard_project_setup()
-
 set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_CURRENT_SOURCE_DIR}/ui)
-#file(GLOB_RECURSE SOURCES "/src/*.cpp")
-file(GLOB_RECURSE HEADERS include/*.h)
-file(GLOB_RECURSE UIS ui/*.ui)
-
-#message(STATUS "Found source files: ${HEADERS}")
 
 qt_add_executable(CloudMeeting
         src/logqueue.cpp
@@ -26,8 +20,27 @@ qt_add_executable(CloudMeeting
         src/mytextedit.cpp
         src/netheader.cpp
         src/screen.cpp
-        ${HEADERS}
-        ${UIS}
+        src/DeviceEnumerator.cpp
+        src/VideoCapture.cpp
+        src/VideoWidget.cpp
+        src/ffmpegDecoder.cpp
+#        ${HEADERS}
+        include/mainwindow.h
+        include/DeviceEnumerator.h
+        include/log_global.h
+        include/logqueue.h
+        include/mytextedit.h
+        include/netheader.h
+        include/screen.h
+        include/ThreadSafeQueue.h
+        include/VideoCapture.h
+        include/VideoWidget.h
+        include/AVSmartPtrs.h
+        include/ffmpegDecoder.h
+#        ${UIS}
+        ui/mainwindow.ui
+
+
 )
 
 target_include_directories(CloudMeeting PRIVATE SYSTEM
@@ -36,27 +49,16 @@ target_include_directories(CloudMeeting PRIVATE SYSTEM
 )
 target_link_directories(CloudMeeting PRIVATE ${FFMPEG_DIR}/lib)
 
-
-INCLUDE_DIRECTORIES(
-    ${PROJECT_SOURCE_DIR}
-)
-
-
 target_link_libraries(CloudMeeting PRIVATE
-    Qt6::Widgets
-    # Qt::Gui
-    Qt::Core
-    Qt::Widgets
+        Qt6::Widgets
 
-    # 再链接FFmpeg库
-    # 注意：请根据你lib文件夹下的实际文件名修改
-    # 如果是 .a 文件，就写 avcodec.a
-    # 如果是 .lib 文件，就写 avcodec.lib 或者直接写 avcodec
-    avcodec
-    avformat
-    avutil
-    avdevice
-    swscale
+        # CMake 会在链接目录中自动寻找 avcodec.lib/avcodec.a 等
+        avcodec
+        avformat
+        avutil
+        avdevice
+        swscale
+        swresample
 )
 
 include(GNUInstallDirs)

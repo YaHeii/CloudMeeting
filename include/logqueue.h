@@ -21,8 +21,10 @@ public:
     }
     LogQueue(const LogQueue&) = delete;
     LogQueue& operator=(const LogQueue&) = delete;
+
     void stopImmediately();
     void print(const char* file, const char* func, int line, const char* fmt, ...);
+
 private:
     explicit LogQueue(QObject *parent = nullptr);
     void run();
