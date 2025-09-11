@@ -20,14 +20,14 @@ MainWindow::MainWindow(QWidget *parent)
 
     WRITE_LOG("-------------------------Application Start---------------------------");
     WRITE_LOG("main UI thread id: 0x%p", QThread::currentThreadId());
-
+    ui->setupUi(this);
     _createmeet = false;
     // _openCamera = false;
     _joinmeet = false;
     Screen::init();
     MainWindow::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
 
-    ui->setupUi(this);
+    m_videoWidget = ui->videoDisplayWidget;
 
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui->openVideo->setText(QString(OPENVIDEO).toUtf8());
@@ -103,12 +103,12 @@ MainWindow::~MainWindow()
         m_CaptureThread->wait(); // 等待线程完全退出
     }
     if(m_audioDecoderThread->isRunning()) {
-        QMetaObject::invokeMethod(m_videoDecoder, "stopDecoding", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(m_audioDecoder, "stopDecoding", Qt::QueuedConnection);
         m_audioDecoderThread->quit();
         m_audioDecoderThread->wait();
     }
     if(m_videoDecoderThread->isRunning()) {
-        QMetaObject::invokeMethod(m_audioDecoder, "stopDecoding", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(m_videoDecoder, "stopDecoding", Qt::QueuedConnection);
         m_videoDecoderThread->quit();
         m_videoDecoderThread->wait();
     }

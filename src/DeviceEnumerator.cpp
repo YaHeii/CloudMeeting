@@ -1,15 +1,9 @@
-//
-// Created by lenovo on 25-9-10.
-//
-
 #include "DeviceEnumerator.h"
 #include <QDebug>
 
-#include "logqueue.h"
-#include "log_global.h"
-
 extern "C" {
 #include <libavdevice/avdevice.h>
+#include <libavutil/error.h> // for av_strerror
 }
 
 QStringList DeviceEnumerator::getDevices(MediaType mediaType)
@@ -34,7 +28,6 @@ QStringList DeviceEnumerator::getDevices(MediaType mediaType)
     }
 
     AVDeviceInfoList *deviceInfoList = nullptr;
-    // 调用FFmpeg的API来列出输入源
     int ret = avdevice_list_input_sources(inputFormat, nullptr, nullptr, &deviceInfoList);
 
     if (ret < 0) {
@@ -48,27 +41,33 @@ QStringList DeviceEnumerator::getDevices(MediaType mediaType)
 
     for (int i = 0; i < deviceInfoList->nb_devices; ++i) {
         AVDeviceInfo *deviceInfo = deviceInfoList->devices[i];
-        // dshow下，需要根据媒体类型过滤
 
-#ifdef Q_OS_WIN
-        QString deviceName = QString::fromStdString(deviceInfo->device_name);
-       //  qDebug() << "Found Device" << i << "->"
-       // << "Name:" << deviceName;
-        WRITE_LOG("Found Device",i,"Name:",deviceName);
-        if (mediaType == MediaType::Video && deviceName.startsWith("video=")) {
-            // deviceInfo->device_description 更友好，比如 "Integrated Camera"
-            deviceList.append(QString::fromStdString(deviceInfo->device_description));
-        } else if (mediaType == MediaType::Audio && deviceName.startsWith("audio=")) {
-            deviceList.append(QString::fromStdString(deviceInfo->device_description));
+        // 检查 media_types 指针是否有效
+        if (deviceInfo->media_types) {
+            for (int j = 0; deviceInfo->media_types[j] != AVMEDIA_TYPE_NB; ++j) {
+                bool typeMatch = false;
+                if (mediaType == MediaType::Video && deviceInfo->media_types[j] == AVMEDIA_TYPE_VIDEO) {
+                    typeMatch = true;
+                } else if (mediaType == MediaType::Audio && deviceInfo->media_types[j] == AVMEDIA_TYPE_AUDIO) {
+                    typeMatch = true;
+                }
+
+                if (typeMatch) {
+                    // 使用 device_description，因为它通常更友好
+                    QString friendlyName = QString::fromStdString(deviceInfo->device_description);
+                    qDebug() << "Found matching device:" << friendlyName;
+                    deviceList.append(friendlyName);
+                    break; // 已找到匹配类型，继续检查下一个设备
+                }
+            }
         }
-#else
-        // Linux下，v4l2/alsa列出的直接就是需要的
-        deviceList.append(QString::fromStdString(deviceInfo->device_name));
-#endif
     }
 
-    // 释放列表，否则会内存泄漏
+    // 释放列表，防止内存泄漏
     avdevice_free_list_devices(&deviceInfoList);
+
+    // 移除可能出现的重复项
+    deviceList.removeDuplicates();
 
     return deviceList;
 }

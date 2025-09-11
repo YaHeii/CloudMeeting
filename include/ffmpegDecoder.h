@@ -37,6 +37,7 @@ private:
     QUEUE_DATA<AVPacketPtr>* m_packetQueue;
     QUEUE_DATA<std::unique_ptr<QImage>>* m_frameQueue;
 
+    uint8_t* rgbBuffer = nullptr;
     volatile bool m_isDecoding = false;
 
     AVCodecContext* m_codecCtx = nullptr;

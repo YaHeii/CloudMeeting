@@ -29,8 +29,8 @@ public:
     ~VideoCapture();
 
     void setPacketQueue(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue);
-    AVCodecParameters* getVideoCodecParameters();
-    AVCodecParameters* getAudioCodecParameters();
+    // AVCodecParameters* getVideoCodecParameters();
+    // AVCodecParameters* getAudioCodecParameters();
 
     void closeDevice();
 signals:

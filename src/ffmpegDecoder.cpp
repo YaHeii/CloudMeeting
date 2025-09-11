@@ -36,7 +36,6 @@ void ffmpegDecoder::startDecoding() {
     AVFramePtr frame(av_frame_alloc());
     AVFramePtr rgbFrame(av_frame_alloc());
     ////TODO:内存优化
-    uint8_t* buffer = nullptr;
     while (m_isDecoding) {
         AVPacketPtr packet;
         if (!m_packetQueue->dequeue(packet)) {
@@ -52,8 +51,8 @@ void ffmpegDecoder::startDecoding() {
                                                          m_codecCtx->width, m_codecCtx->height, AV_PIX_FMT_RGB24,
                                                          SWS_BILINEAR, nullptr, nullptr, nullptr);
                 int bufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, m_codecCtx->width, m_codecCtx->height, 1);
-                buffer = (uint8_t*)av_malloc(bufferSize * sizeof(uint8_t));
-                av_image_fill_arrays(rgbFrame->data, rgbFrame->linesize, buffer, AV_PIX_FMT_RGB24,
+                rgbBuffer = (uint8_t*)av_malloc(bufferSize * sizeof(uint8_t));
+                av_image_fill_arrays(rgbFrame->data, rgbFrame->linesize, rgbBuffer, AV_PIX_FMT_RGB24,
                                      m_codecCtx->width, m_codecCtx->height, 1);
             }
             if (m_swsCtx) {
@@ -70,8 +69,6 @@ void ffmpegDecoder::startDecoding() {
             }
         }
     }
-    av_free(buffer);
-    buffer = nullptr;
     WRITE_LOG("Decoding loop finished.");
 }
 void ffmpegDecoder::stopDecoding()
@@ -84,4 +81,10 @@ void ffmpegDecoder::clear()
     stopDecoding();
     if(m_codecCtx) avcodec_free_context(&m_codecCtx);
     if(m_swsCtx) sws_freeContext(m_swsCtx);
+    m_swsCtx = nullptr;
+
+    if(rgbBuffer) {
+        av_free(rgbBuffer);
+        rgbBuffer = nullptr;
+    }
 }
