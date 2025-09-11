@@ -3,9 +3,7 @@
 #include "logqueue.h"
 #include "log_global.h"
 
-
 bool ffmpegInputInitialized = false;
-
 void VideoCapture::initializeFFmpeg() {
     if (!ffmpegInputInitialized) {
         avdevice_register_all();
@@ -16,6 +14,12 @@ void VideoCapture::initializeFFmpeg() {
 
 VideoCapture::VideoCapture(QObject* parent) : QObject(parent) {
     initializeFFmpeg();
+}
+
+void VideoCapture::setPacketQueue(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue)
+{
+    m_videoPacketQueue = videoQueue;
+    m_audioPacketQueue = audioQueue;
 }
 
 VideoCapture::~VideoCapture() {
@@ -96,16 +100,19 @@ void VideoCapture::openDevice(const QString &videoDeviceName, const QString &aud
         closeDevice();
         return;
     }
-
+    m_videoStreamIndex = av_find_best_stream(m_FormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    m_audioStreamIndex = av_find_best_stream(m_FormatCtx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
     WRITE_LOG("Device opened successfully.");
     WRITE_LOG("Video stream index:",m_videoStreamIndex);
-    WRITE_LOG("Video stream index:",m_audioStreamIndex);
-    emit deviceOpenSuccessfully(m_FormatCtx->streams[m_videoStreamIndex]->codecpar);
-    //这里提交语音解码？
+    WRITE_LOG("Audio stream index:",m_audioStreamIndex);
+    AVCodecParameters* vParams = (m_videoStreamIndex >= 0) ? m_FormatCtx->streams[m_videoStreamIndex]->codecpar : nullptr;
+    AVCodecParameters* aParams = (m_audioStreamIndex >= 0) ? m_FormatCtx->streams[m_audioStreamIndex]->codecpar : nullptr;
+
+    emit deviceOpenSuccessfully(vParams,aParams);
 }
 
 void VideoCapture::startReading() {
-    if (!m_packetQueue) {
+    if (!m_videoPacketQueue || !m_audioPacketQueue) {
         WRITE_LOG("Packet queue NOT SET.");
     }
 
@@ -124,14 +131,12 @@ void VideoCapture::startReading() {
         }
 
         int ret = av_read_frame(m_FormatCtx, packet.get());
-        if (ret < 0) {
-            break;
-        }
+        if (ret < 0) { break;}
 
         if (packet->stream_index == m_videoStreamIndex) {
-            m_packetQueue->enqueue(std::move(packet));
+            m_videoPacketQueue->enqueue(std::move(packet));
         }else if (packet->stream_index == m_audioStreamIndex) {
-            m_packetQueue->enqueue(std::move(packet));
+            m_audioPacketQueue->enqueue(std::move(packet));
         }else {
             //emit errorOccurred("Failed to read frame.");
         }

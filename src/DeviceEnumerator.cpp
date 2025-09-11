@@ -5,6 +5,9 @@
 #include "DeviceEnumerator.h"
 #include <QDebug>
 
+#include "logqueue.h"
+#include "log_global.h"
+
 extern "C" {
 #include <libavdevice/avdevice.h>
 }
@@ -46,8 +49,12 @@ QStringList DeviceEnumerator::getDevices(MediaType mediaType)
     for (int i = 0; i < deviceInfoList->nb_devices; ++i) {
         AVDeviceInfo *deviceInfo = deviceInfoList->devices[i];
         // dshow下，需要根据媒体类型过滤
+
 #ifdef Q_OS_WIN
         QString deviceName = QString::fromStdString(deviceInfo->device_name);
+       //  qDebug() << "Found Device" << i << "->"
+       // << "Name:" << deviceName;
+        WRITE_LOG("Found Device",i,"Name:",deviceName);
         if (mediaType == MediaType::Video && deviceName.startsWith("video=")) {
             // deviceInfo->device_description 更友好，比如 "Integrated Camera"
             deviceList.append(QString::fromStdString(deviceInfo->device_description));

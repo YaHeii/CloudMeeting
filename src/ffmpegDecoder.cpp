@@ -69,9 +69,10 @@ void ffmpegDecoder::startDecoding() {
                 emit newFrameAvailable();
             }
         }
-        av_free(buffer);
-        WRITE_LOG("Decoding loop finished.");
     }
+    av_free(buffer);
+    buffer = nullptr;
+    WRITE_LOG("Decoding loop finished.");
 }
 void ffmpegDecoder::stopDecoding()
 {

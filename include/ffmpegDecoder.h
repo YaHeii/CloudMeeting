@@ -1,6 +1,9 @@
-//
-// Created by lenovo on 25-9-10.
-//
+/**
+ *madebyYahei
+ *对传入的packetQUEUE进行解码完成渲染等操作
+ *这里不使用摄像头传输的原始数据，而是FFmpeg的封装packet，
+ *保证在远端视频解码的代码可复用性
+ */
 
 #ifndef FFMPEGDECODER_H
 #define FFMPEGDECODER_H

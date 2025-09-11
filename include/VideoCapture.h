@@ -1,6 +1,9 @@
-//
-// Created by lenovo on 25-9-9.
-//
+/**
+*     madebyYahei
+*    捕捉packet，生成视频音频packet队列，返回音视频param
+*    QUEUE_DATA<AVPacketPtr>* m_VideopacketQueue = nullptr;
+     QUEUE_DATA<AVPacketPtr>* m_AudiopacketQueue = nullptr;
+ */
 
 #ifndef FFMPEGINPUT_H
 #define FFMPEGINPUT_H
@@ -25,17 +28,16 @@ public:
     explicit VideoCapture(QObject* parent = nullptr);
     ~VideoCapture();
 
-    void setPacketQueue(QUEUE_DATA<AVPacketPtr>* packetQueue);
-    AVCodecParameters* getCodecParameters();
+    void setPacketQueue(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue);
+    AVCodecParameters* getVideoCodecParameters();
+    AVCodecParameters* getAudioCodecParameters();
 
     void closeDevice();
 signals:
-    void deviceOpenSuccessfully(AVCodecParameters* params);
+    void deviceOpenSuccessfully(AVCodecParameters* vparams,AVCodecParameters* aParams);
 
     void errorOccurred(const QString &errorText);
 
-    void videoPacketReady(AVPacket *packet);
-    void audioPacketReady(AVPacket *packet);
 public slots:
     void openDevice(const QString &videoDeviceName, const QString &audioDeviceName);
 
@@ -49,7 +51,8 @@ private:
     volatile bool m_isReading = false;
     static void initializeFFmpeg();
 
-    QUEUE_DATA<AVPacketPtr>* m_packetQueue = nullptr;
+    QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue = nullptr;
+    QUEUE_DATA<AVPacketPtr>* m_audioPacketQueue = nullptr;
 };
 
 

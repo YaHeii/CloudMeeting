@@ -12,6 +12,6 @@ int main(int argc, char *argv[])
     w.show();
 
     //...
-    qDebug() << "FFmpeg libavcodec version: " << avcodec_configuration();
+    // qDebug() << "FFmpeg libavcodec version: " << avcodec_configuration();
     return a.exec();
 }
