@@ -51,6 +51,7 @@ private:
     volatile bool m_isReading = false;
     static void initializeFFmpeg();
 
+    QMutex m_queueMutex;  // 保护队列指针访问的互斥锁
     QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue = nullptr;
     QUEUE_DATA<AVPacketPtr>* m_audioPacketQueue = nullptr;
 };

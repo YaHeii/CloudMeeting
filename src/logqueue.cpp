@@ -1,46 +1,55 @@
 #include <QDebug>
 #include "logqueue.h"
+#include <QDateTime>
+#include <QFile>
+#include <QTextStream>
 
-
-LogQueue::LogQueue(QObject *parent) : QThread(parent) {}
+LogQueue::LogQueue(QObject *parent) : QThread(parent), m_isCanRun(false), logfile(nullptr) {}
 
 void LogQueue::run()
 {
     m_isCanRun = true;
-    FILE* logfile = nullptr;
-    errno_t r = fopen_s(&logfile, "./log.txt", "a");
-    if(r != 0 || logfile == nullptr)
-    {
-        qDebug() << "打开文件失败:" << r;
+    
+    // 使用Qt文件API替代标准C文件API，提高跨平台兼容性
+    QFile file("./log.txt");
+    if (!file.open(QIODevice::WriteOnly)) {
+        qDebug() << "打开日志文件失败:" << file.errorString();
         m_isCanRun = false;
         return;
     }
-    for(;;)
-    {
+    
+    QTextStream out(&file);
+    
+    qDebug() << "日志线程已启动";
+    
+    while (true) {
+        // 检查是否应该停止线程
         {
             QMutexLocker lock(&m_lock);
-            if(m_isCanRun == false)
-            {
+            if (!m_isCanRun) {
                 break;
             }
         }
+        
         Log log;
-        if(!m_logQueue.dequeue(log)) continue;
-
+        if (!m_logQueue.dequeue(log)) {
+            // 队列超时，继续循环检查是否需要停止线程
+            continue;
+        }
 
         if (!log.data.isEmpty()) {
-            size_t to_write = log.data.size();
-            size_t written = fwrite(log.data.constData(), 1, to_write, logfile);
-
-            if (written != to_write) {
-                qDebug() << "Log thread: Failed to write full log message to file.";
+            // 写入日志到文件
+            out << log.data;
+            out.flush(); // 立即刷新到磁盘
+            
+            if (file.error() != QFile::NoError) {
+                qDebug() << "写入日志文件时出错:" << file.errorString();
             }
         }
     }
-    fflush(logfile);
-    fclose(logfile);
-    logfile = nullptr;
-    qDebug() << "Log thread finished.";
+    
+    file.close();
+    qDebug() << "日志线程已结束";
 }
 
 void LogQueue::stopImmediately()
@@ -51,28 +60,30 @@ void LogQueue::stopImmediately()
     }
     m_isCanRun = false;
 
-    //唤醒可能正在等待的 run() 线程
+    // 唤醒可能正在等待的 run() 线程
     m_logQueue.clear(); // clear() 内部会调用 wakeAll()
 }
 
 void LogQueue::print(const char* file, const char* func, int line, const char* fmt, ...)
 {
-
+    // 格式化时间戳和位置信息
     QString prefix = QString("[%1] <%2:%3:%4> ")
                          .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz"))
                          .arg(file)
                          .arg(func)
                          .arg(line);
 
-
+    // 处理可变参数
     va_list ap;
     va_start(ap, fmt);
     QString log_content = QString::vasprintf(fmt, ap);
     va_end(ap);
+    
+    // 组合完整日志消息
     QByteArray log_data = (prefix + log_content + "\n").toUtf8();
 
+    // 创建日志对象并加入队列
     Log log;
     log.data = std::move(log_data);
-
     m_logQueue.enqueue(log);
 }

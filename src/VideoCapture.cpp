@@ -16,15 +16,20 @@ VideoCapture::VideoCapture(QObject* parent) : QObject(parent) {
     initializeFFmpeg();
 }
 
-void VideoCapture::setPacketQueue(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue)
-{
-    m_videoPacketQueue = videoQueue;
-    m_audioPacketQueue = audioQueue;
+VideoCapture::~VideoCapture() {
+    // 确保读取已停止
+    stopReading();
+    // 确保设备已关闭
+    closeDevice();
+    WRITE_LOG("VideoCapture destroyed.");
 }
 
-VideoCapture::~VideoCapture() {
-    closeDevice();
-    WRITE_LOG("Closing device.");
+void VideoCapture::setPacketQueue(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue)
+{
+    // 线程安全地设置队列指针
+    QMutexLocker locker(&m_queueMutex);
+    m_videoPacketQueue = videoQueue;
+    m_audioPacketQueue = audioQueue;
 }
 
 void VideoCapture::openDevice(const QString &videoDeviceName, const QString &audioDeviceName) {
@@ -49,6 +54,8 @@ void VideoCapture::openDevice(const QString &videoDeviceName, const QString &aud
         emit errorOccurred("No device name provided for Windows.");
         return;
     }
+    // 设置dshow参数以增加缓冲区大小，避免帧丢失
+    av_dict_set(&options, "rtbufsize", "10000000", 0); // 设置为100MB缓冲区
     // 可以设置一些dshow参数，例如视频尺寸、帧率等
     // av_dict_set(&options, "video_size", "640x480", 0);
     // av_dict_set(&options, "framerate", "30", 0);
@@ -92,19 +99,36 @@ void VideoCapture::openDevice(const QString &videoDeviceName, const QString &aud
         return;
     }
 
+    // 查找最佳视频和音频流
     m_videoStreamIndex = av_find_best_stream(m_FormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
     m_audioStreamIndex = av_find_best_stream(m_FormatCtx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
 
+    // 检查是否找到至少一个流
     if (m_videoStreamIndex < 0 && m_audioStreamIndex < 0) {
         emit errorOccurred("Failed to find any video or audio stream.");
         closeDevice();
         return;
     }
-    m_videoStreamIndex = av_find_best_stream(m_FormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
-    m_audioStreamIndex = av_find_best_stream(m_FormatCtx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+
+    // 记录找到的流信息
     WRITE_LOG("Device opened successfully.");
-    WRITE_LOG("Video stream index:",m_videoStreamIndex);
-    WRITE_LOG("Audio stream index:",m_audioStreamIndex);
+    if (m_videoStreamIndex >= 0) {
+        WRITE_LOG("Video stream index:", m_videoStreamIndex);
+        AVCodecParameters* vParams = m_FormatCtx->streams[m_videoStreamIndex]->codecpar;
+        WRITE_LOG("Video codec: %1", QString("Codec ID: %1").arg(vParams->codec_id));
+        WRITE_LOG("Video format: %1x%2", QString("%1x%2").arg(vParams->width).arg(vParams->height));
+    } else {
+        WRITE_LOG("No video stream found.");
+    }
+    
+    if (m_audioStreamIndex >= 0) {
+        WRITE_LOG("Audio stream index:", m_audioStreamIndex);
+        AVCodecParameters* aParams = m_FormatCtx->streams[m_audioStreamIndex]->codecpar;
+        WRITE_LOG("Audio codec: %1", QString("Codec ID: %1").arg(aParams->codec_id));
+        // WRITE_LOG(QString("Audio channels: %1").arg(aParams->channels));
+    } else {
+        WRITE_LOG("No audio stream found.");
+    }
     AVCodecParameters* vParams = (m_videoStreamIndex >= 0) ? m_FormatCtx->streams[m_videoStreamIndex]->codecpar : nullptr;
     AVCodecParameters* aParams = (m_audioStreamIndex >= 0) ? m_FormatCtx->streams[m_audioStreamIndex]->codecpar : nullptr;
 
@@ -112,33 +136,56 @@ void VideoCapture::openDevice(const QString &videoDeviceName, const QString &aud
 }
 
 void VideoCapture::startReading() {
-    if (!m_videoPacketQueue || !m_audioPacketQueue) {
+    // 线程安全地获取队列指针
+    QUEUE_DATA<AVPacketPtr>* videoQueue = nullptr;
+    QUEUE_DATA<AVPacketPtr>* audioQueue = nullptr;
+    {
+        QMutexLocker locker(&m_queueMutex);
+        videoQueue = m_videoPacketQueue;
+        audioQueue = m_audioPacketQueue;
+    }
+    
+    if (!videoQueue || !audioQueue) {
         WRITE_LOG("Packet queue NOT SET.");
+        return;
     }
 
     if (!m_FormatCtx) {
-        WRITE_LOG("Failed to start reading.");
+        WRITE_LOG("Failed to start reading - format context is null.");
         return;
     }
-    m_isReading = true;
+    
     WRITE_LOG("Starting to read frames...");
 
+    m_isReading = true;
     while (m_isReading) {
         AVPacketPtr packet(av_packet_alloc());
         if (!packet) {
+            WRITE_LOG("Failed to allocate packet.");
             emit errorOccurred("Failed to allocate packet.");
             break;
         }
 
         int ret = av_read_frame(m_FormatCtx, packet.get());
-        if (ret < 0) { break;}
+        if (ret < 0) { 
+            // 检查是否是正常结束还是错误
+            if (ret == AVERROR_EOF) {
+                WRITE_LOG("End of file reached.");
+            } else {
+                char errbuf[1024] = {0};
+                av_strerror(ret, errbuf, sizeof(errbuf));
+                WRITE_LOG("Failed to read frame: %s", errbuf);
+                emit errorOccurred(QString("Failed to read frame: %1").arg(errbuf));
+            }
+            break;
+        }
 
         if (packet->stream_index == m_videoStreamIndex) {
-            m_videoPacketQueue->enqueue(std::move(packet));
-        }else if (packet->stream_index == m_audioStreamIndex) {
-            m_audioPacketQueue->enqueue(std::move(packet));
-        }else {
-            //emit errorOccurred("Failed to read frame.");
+            videoQueue->enqueue(std::move(packet));
+        } else if (packet->stream_index == m_audioStreamIndex) {
+            audioQueue->enqueue(std::move(packet));
+        } else {
+
         }
     }
     m_isReading = false;
@@ -151,11 +198,10 @@ void VideoCapture::stopReading() {
 
 void VideoCapture::closeDevice()
 {
-    stopReading(); // 确保读取循环已停止
-
     if (m_FormatCtx) {
+        stopReading();
         avformat_close_input(&m_FormatCtx);
-        m_FormatCtx = nullptr; // 置空指针，防止野指针
+        m_FormatCtx = nullptr;
         m_videoStreamIndex = -1;
         m_audioStreamIndex = -1;
         WRITE_LOG("Device closed.");

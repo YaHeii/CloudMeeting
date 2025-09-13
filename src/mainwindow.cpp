@@ -44,6 +44,11 @@ MainWindow::MainWindow(QWidget *parent)
     ui->sendmsg->setDisabled(false);
     mainip = 0; //主屏幕显示的用户IP图像
 
+    // 初始化队列
+    m_videoPacketQueue = new QUEUE_DATA<AVPacketPtr>();
+    m_videoFrameQueue = new QUEUE_DATA<std::unique_ptr<QImage>>();
+    m_audioPacketQueue = new QUEUE_DATA<AVPacketPtr>();
+
     //采集线程
     m_CaptureThread = new QThread(this);
     m_capture = new VideoCapture();
@@ -69,16 +74,18 @@ MainWindow::MainWindow(QWidget *parent)
 
     // connect(m_CaptureThread, &QThread::started, m_capture, &VideoCapture::startReading);
 
-    //// 视频
+
     //// 采集器打开发出信号携带解码参数
     connect(m_capture, &VideoCapture::deviceOpenSuccessfully, this, &MainWindow::onDeviceOpened);
+
+    //// 视频
     //// 解码器初始化成功，开始解码
     connect(m_videoDecoderThread, &QThread::started, m_videoDecoder, &ffmpegDecoder::startDecoding);
-    //// 采集线程
-    // connect(m_CaptureThread, &QThread::started, m_capture, &VideoCapture::startReading);
     //// 每解出一帧通知主线程
     connect(m_videoDecoder, &ffmpegDecoder::newFrameAvailable, this, &MainWindow::onNewFrameAvailable, Qt::QueuedConnection);
+
     connect(m_capture, &VideoCapture::errorOccurred, this, &MainWindow::handleError);
+
 
 
     // 音频
@@ -97,21 +104,49 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
+    // 停止视频捕获
     if (m_CaptureThread && m_CaptureThread->isRunning()) {
-        QMetaObject::invokeMethod(m_capture, "stopReading", Qt::QueuedConnection);
+        // 先停止读取
+        QMetaObject::invokeMethod(m_capture, "stopReading", Qt::BlockingQueuedConnection);
+        // 再关闭设备
+        QMetaObject::invokeMethod(m_capture, "closeDevice", Qt::BlockingQueuedConnection);
         m_CaptureThread->quit();
-        m_CaptureThread->wait(); // 等待线程完全退出
+        m_CaptureThread->wait();
     }
-    if(m_audioDecoderThread->isRunning()) {
-        QMetaObject::invokeMethod(m_audioDecoder, "stopDecoding", Qt::QueuedConnection);
+    
+    // 停止音频解码
+    if (m_audioDecoderThread && m_audioDecoderThread->isRunning()) {
+        QMetaObject::invokeMethod(m_audioDecoder, "stopDecoding", Qt::BlockingQueuedConnection);
         m_audioDecoderThread->quit();
         m_audioDecoderThread->wait();
     }
-    if(m_videoDecoderThread->isRunning()) {
-        QMetaObject::invokeMethod(m_videoDecoder, "stopDecoding", Qt::QueuedConnection);
+    
+    // 停止视频解码
+    if (m_videoDecoderThread && m_videoDecoderThread->isRunning()) {
+        QMetaObject::invokeMethod(m_videoDecoder, "stopDecoding", Qt::BlockingQueuedConnection);
         m_videoDecoderThread->quit();
         m_videoDecoderThread->wait();
     }
+    
+    // 清理队列，确保在其他对象销毁前清理队列以避免wakeAll崩溃
+    if (m_videoPacketQueue) {
+        m_videoPacketQueue->clear();
+        delete m_videoPacketQueue;
+        m_videoPacketQueue = nullptr;
+    }
+    
+    if (m_videoFrameQueue) {
+        m_videoFrameQueue->clear();
+        delete m_videoFrameQueue;
+        m_videoFrameQueue = nullptr;
+    }
+    
+    if (m_audioPacketQueue) {
+        m_audioPacketQueue->clear();
+        delete m_audioPacketQueue;
+        m_audioPacketQueue = nullptr;
+    }
+    
     delete ui;
 }
 ////TODO:音视频通道开关解耦
@@ -158,15 +193,13 @@ void MainWindow::onDeviceOpened(AVCodecParameters* vParams, AVCodecParameters* a
     if (vParams) {
         WRITE_LOG("Initializing video decoder");
         QMetaObject::invokeMethod(m_videoDecoder, "init", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, vParams));
+        QMetaObject::invokeMethod(m_videoDecoder, "startDecoding", Qt::QueuedConnection);
     }
     if (aParams) {
         WRITE_LOG("Initializing audio decoder");
-        // 在音频解码线程中初始化解码器
         QMetaObject::invokeMethod(m_audioDecoder, "init", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, aParams));
-        // 音频解码器初始化后，也可以开始工作
         QMetaObject::invokeMethod(m_audioDecoder, "startDecoding", Qt::QueuedConnection);
     }
-    // 在解码线程中初始化解码器
     QMetaObject::invokeMethod(m_capture, "startReading", Qt::QueuedConnection);
 }
 

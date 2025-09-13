@@ -7,6 +7,7 @@ ffmpegDecoder::ffmpegDecoder(QUEUE_DATA<AVPacketPtr>* packetQueue, QUEUE_DATA<st
 
 ffmpegDecoder::~ffmpegDecoder()
 {
+    stopDecoding();
     clear();
 }
 
@@ -34,7 +35,9 @@ void ffmpegDecoder::startDecoding() {
     WRITE_LOG("ffmpegDecoder::startDecoding");
 
     AVFramePtr frame(av_frame_alloc());
+
     AVFramePtr rgbFrame(av_frame_alloc());
+
     ////TODO:内存优化
     while (m_isDecoding) {
         AVPacketPtr packet;
@@ -66,11 +69,13 @@ void ffmpegDecoder::startDecoding() {
 
                 // 通知UI线程有新帧可用
                 emit newFrameAvailable();
+                WRITE_LOG("NewFrameAvailable");
             }
         }
     }
     WRITE_LOG("Decoding loop finished.");
 }
+
 void ffmpegDecoder::stopDecoding()
 {
     m_isDecoding = false;

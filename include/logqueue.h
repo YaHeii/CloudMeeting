@@ -29,7 +29,7 @@ private:
     explicit LogQueue(QObject *parent = nullptr);
     void run();
     QMutex m_lock;
-    bool m_isCanRun;
+    volatile bool m_isCanRun;
     QUEUE_DATA<Log> m_logQueue;
     FILE *logfile;
 };
