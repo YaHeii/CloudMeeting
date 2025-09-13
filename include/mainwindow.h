@@ -10,6 +10,7 @@
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
 #include "ffmpegAudioDecoder.h"
+#include "ffmpegEncoder.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -41,18 +42,28 @@ private:
 
 
     // --- 视频处理链 ---
-    QThread* m_videoDecoderThread;
     ffmpegDecoder* m_videoDecoder; // 之前的 ffmpegDecoder
-    QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue;
-    QUEUE_DATA<std::unique_ptr<QImage>>* m_videoFrameQueue;
+    ffmpegEncoder* m_videoEncoder;
+    QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue;//采集队列
+    QUEUE_DATA<std::unique_ptr<QImage>>* m_QimageQueue;//QT显示队列
+    QUEUE_DATA<AVFramePtr>* m_videoFrameQueue;//网络传输帧队列
+    QUEUE_DATA<AVPacketPtr>* m_videoSendPacketQueue;//发送队列
 
     // --- 音频处理链 ---
-    QThread* m_audioDecoderThread;
     ffmpegAudioDecoder* m_audioDecoder;
+    ffmpegEncoder* m_audioEncoder;
     QUEUE_DATA<AVPacketPtr>* m_audioPacketQueue;
-    //QUEUE_DATA<AudioFrame> m_audioFrameQueue; // 解码后的音频帧队列
+    QUEUE_DATA<AVFramePtr>* m_audioFrameQueue;//网络传输帧队列
+    QUEUE_DATA<AVPacketPtr>* m_audioSendPacketQueue;//发送队列
+
+    // --- 线程 ---
+    QThread* m_videoDecoderThread;
+    QThread* m_audioDecoderThread;
+    QThread* m_videoEncoderThread;
+    QThread* m_audioEncoderThread;
 
     VideoWidget* m_videoWidget;
+    QUEUE_DATA<AVPacketPtr>* m_packetQueue;//采集队列
 
 private slots:
     ////TODO:开启视频和开启音频按钮触发后转变为关闭视频和关闭音频
@@ -63,8 +74,6 @@ private slots:
     void onNewFrameAvailable();
 
     //// 处理采集到的数据包
-    // void handleVideoPacket(AVPacket *packet);
-    // void handleAudioPacket(AVPacket *packet);
     void handleDeviceOpened();
     void handleError(const QString &errorText);
     //

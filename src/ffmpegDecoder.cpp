@@ -2,8 +2,8 @@
 
 #include "logqueue.h"
 #include "log_global.h"
-ffmpegDecoder::ffmpegDecoder(QUEUE_DATA<AVPacketPtr>* packetQueue, QUEUE_DATA<std::unique_ptr<QImage>>* frameQueue,QObject *parent)
-    : QObject{parent}, m_packetQueue(packetQueue), m_frameQueue(frameQueue) {}
+ffmpegDecoder::ffmpegDecoder(QUEUE_DATA<AVPacketPtr>* packetQueue, QUEUE_DATA<std::unique_ptr<QImage>>* imageQueue,QUEUE_DATA<AVFramePtr>* frameQueue ,QObject *parent)
+    : QObject{parent}, m_packetQueue(packetQueue),m_frameQueue(frameQueue), m_QimageQueue(imageQueue) {}
 
 ffmpegDecoder::~ffmpegDecoder()
 {
@@ -29,7 +29,7 @@ bool ffmpegDecoder::init(AVCodecParameters *params) {
     return true;
 }
 
-
+//// TODO：使用decodingLOOP和stratstartDecoding解耦
 void ffmpegDecoder::startDecoding() {
     m_isDecoding = true;
     WRITE_LOG("ffmpegDecoder::startDecoding");
@@ -48,7 +48,8 @@ void ffmpegDecoder::startDecoding() {
         if (avcodec_send_packet(m_codecCtx, packet.get()) != 0) {
             continue;
         }
-        while (avcodec_receive_frame(m_codecCtx,frame.get())==0) {
+        while (m_isDecoding && avcodec_receive_frame(m_codecCtx,frame.get())==0) {
+            m_frameQueue->enqueue(std::move(frame));//添加到帧队列,用于协议封装
             if (!m_swsCtx) {
                 m_swsCtx = sws_getContext(m_codecCtx->width, m_codecCtx->height, m_codecCtx->pix_fmt,
                                                          m_codecCtx->width, m_codecCtx->height, AV_PIX_FMT_RGB24,
@@ -64,8 +65,7 @@ void ffmpegDecoder::startDecoding() {
 
                 QImage tempImage(rgbFrame->data[0], m_codecCtx->width, m_codecCtx->height, QImage::Format_RGB888);
                 auto image = std::make_unique<QImage>(tempImage.copy());//copy做深拷贝
-                // 将QImage的所有权转移到帧队列
-                m_frameQueue->enqueue(std::move(image));
+                m_QimageQueue->enqueue(std::move(image));//添加到图片队列，用于QT渲染
 
                 // 通知UI线程有新帧可用
                 emit newFrameAvailable();

@@ -18,11 +18,11 @@ extern "C" {
 #include <libswscale/swscale.h>
 #include <libavutil/imgutils.h>
 }
-
+////TODO：修改类名为ffmpegVideoDecoder
 class ffmpegDecoder : public QObject{
     Q_OBJECT
 public:
-    explicit ffmpegDecoder(QUEUE_DATA<AVPacketPtr>* packetQueue,QUEUE_DATA<std::unique_ptr<QImage>>*frameQueue,QObject *parent = nullptr);
+    explicit ffmpegDecoder(QUEUE_DATA<AVPacketPtr>* packetQueue,QUEUE_DATA<std::unique_ptr<QImage>>*imageQueue,QUEUE_DATA<AVFramePtr>* frameQueue,QObject *parent = nullptr);
     ~ffmpegDecoder();
 signals:
     void newFrameAvailable();
@@ -34,11 +34,13 @@ public slots:
     void stopDecoding();
 private:
     void clear();
-    QUEUE_DATA<AVPacketPtr>* m_packetQueue;
-    QUEUE_DATA<std::unique_ptr<QImage>>* m_frameQueue;
+    QUEUE_DATA<AVPacketPtr>* m_packetQueue;//采集队列
+    QUEUE_DATA<std::unique_ptr<QImage>>* m_QimageQueue;//QT显示队列
+    QUEUE_DATA<AVFramePtr>* m_frameQueue;//网络传输帧队列
 
     uint8_t* rgbBuffer = nullptr;
-    volatile bool m_isDecoding = false;
+    //// TODO：使用std::atomic<bool>保证原子性
+    std::atomic<bool> m_isDecoding = false;
 
     AVCodecContext* m_codecCtx = nullptr;
     const AVCodec* m_codec = nullptr;

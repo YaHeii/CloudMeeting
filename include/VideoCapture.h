@@ -34,7 +34,7 @@ public:
 
     void closeDevice();
 signals:
-    void deviceOpenSuccessfully(AVCodecParameters* vparams,AVCodecParameters* aParams);
+    void deviceOpenSuccessfully(AVCodecParameters* vparams,AVCodecParameters* aparams);
 
     void errorOccurred(const QString &errorText);
 

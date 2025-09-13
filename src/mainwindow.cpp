@@ -46,8 +46,12 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 初始化队列
     m_videoPacketQueue = new QUEUE_DATA<AVPacketPtr>();
-    m_videoFrameQueue = new QUEUE_DATA<std::unique_ptr<QImage>>();
+    m_QimageQueue = new QUEUE_DATA<std::unique_ptr<QImage>>();
+    m_videoFrameQueue = new QUEUE_DATA<AVFramePtr>();
+    m_videoSendPacketQueue = new QUEUE_DATA<AVPacketPtr>();
     m_audioPacketQueue = new QUEUE_DATA<AVPacketPtr>();
+    m_audioFrameQueue = new QUEUE_DATA<AVFramePtr>();
+    m_audioSendPacketQueue = new QUEUE_DATA<AVPacketPtr>();
 
     //采集线程
     m_CaptureThread = new QThread(this);
@@ -55,16 +59,27 @@ MainWindow::MainWindow(QWidget *parent)
     m_capture->setPacketQueue(m_videoPacketQueue, m_audioPacketQueue);
     m_capture->moveToThread(m_CaptureThread);
     m_CaptureThread->start();
-    //音频线程
+    //音频解码线程
     m_audioDecoderThread = new QThread(this);
-    m_audioDecoder = new ffmpegAudioDecoder(m_audioPacketQueue);
+    m_audioDecoder = new ffmpegAudioDecoder(m_audioPacketQueue, m_audioFrameQueue);
     m_audioDecoder->moveToThread(m_audioDecoderThread);
     m_audioDecoderThread->start();
-    //视频线程
+    //视频解码线程
     m_videoDecoderThread = new QThread(this);
-    m_videoDecoder = new ffmpegDecoder(m_videoPacketQueue, m_videoFrameQueue);
+    m_videoDecoder = new ffmpegDecoder(m_videoPacketQueue, m_QimageQueue, m_videoFrameQueue);
     m_videoDecoder->moveToThread(m_videoDecoderThread);
     m_videoDecoderThread->start();
+
+    // 音频编码线程
+    m_audioEncoderThread = new QThread(this);
+    m_audioEncoder = new ffmpegEncoder(m_audioFrameQueue, m_audioSendPacketQueue);
+    m_audioEncoder->moveToThread(m_audioEncoderThread);
+    m_audioEncoderThread->start();
+    // 视频编码线程
+    m_videoEncoderThread = new QThread(this);
+    m_videoEncoder = new ffmpegEncoder(m_videoFrameQueue, m_videoSendPacketQueue);
+    m_videoEncoder->moveToThread(m_videoEncoderThread);
+    m_videoEncoderThread->start();
 
     //获取可用设备
     QStringList videoDevices = DeviceEnumerator::getDevices(MediaType::Video);
@@ -72,10 +87,7 @@ MainWindow::MainWindow(QWidget *parent)
     QStringList audioDevices = DeviceEnumerator::getDevices(MediaType::Audio);
     ui->audioDevicecomboBox->addItems(audioDevices);
 
-    // connect(m_CaptureThread, &QThread::started, m_capture, &VideoCapture::startReading);
-
-
-    //// 采集器打开发出信号携带解码参数
+    //// 采集器打开，发出信号携带解码参数
     connect(m_capture, &VideoCapture::deviceOpenSuccessfully, this, &MainWindow::onDeviceOpened);
 
     //// 视频
@@ -86,15 +98,11 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(m_capture, &VideoCapture::errorOccurred, this, &MainWindow::handleError);
 
-
-
     // 音频
     // 连接音频链的信号槽
     connect(m_audioDecoderThread, &QThread::started, m_audioDecoder, &ffmpegAudioDecoder::startDecoding);
     // connect(m_audioDecoder, &ffmpegAudioDecoder::errorOccurred, this, &MainWindow::onAudioDecodeError);
     // connect(m_capture, &VideoCapture::errorOccurred, this, &MainWindow::onCaptureError);
-
-
 
     // 线程结束后，自动清理工作对象和线程本身
     connect(m_CaptureThread, &QThread::finished, m_capture, &QObject::deleteLater);

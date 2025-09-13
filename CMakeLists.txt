@@ -43,7 +43,8 @@ qt_add_executable(CloudMeeting
         include/ffmpegDecoder.h
 #        ${UIS}
         ui/mainwindow.ui
-
+        src/ffmpegEncoder.cpp
+        src/ffmpegEncoder.h
 
 
 )

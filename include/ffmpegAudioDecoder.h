@@ -20,7 +20,7 @@ extern "C" {
 class ffmpegAudioDecoder : public QObject {
     Q_OBJECT
 public:
-    explicit ffmpegAudioDecoder(QUEUE_DATA<AVPacketPtr>* packetQueue, QObject *parent = nullptr);
+    explicit ffmpegAudioDecoder(QUEUE_DATA<AVPacketPtr>* packetQueue,QUEUE_DATA<AVFramePtr>* frameQueue, QObject *parent = nullptr);
     ~ffmpegAudioDecoder();
 public slots:
 
@@ -31,15 +31,16 @@ private:
     void clear();
 
     QUEUE_DATA<AVPacketPtr>* m_packetQueue;
-    volatile bool m_isDecoding = false;
+    QUEUE_DATA<AVFramePtr>* m_frameQueue;
+    std::atomic<bool> m_isDecoding = false;
 
     // FFmpeg-related members
     AVCodecContext* m_codecCtx = nullptr;
     const AVCodec* m_codec = nullptr;
     SwrContext* m_swrCtx = nullptr; // 用于音频重采样
 
-    // Qt Audio-related members
-    QAudioSink* m_audioSink = nullptr;
+    // Qt Audiosink test
+    // QAudioSink* m_audioSink = nullptr;
     QIODevice* m_audioDevice = nullptr; // 音频输出设备
 };
 

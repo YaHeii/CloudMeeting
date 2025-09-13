@@ -66,10 +66,13 @@ void LogQueue::stopImmediately()
 
 void LogQueue::print(const char* file, const char* func, int line, const char* fmt, ...)
 {
+    const char* fileName = strrchr(file, '/');  // 按 Unix 路径分隔符查找
+    if (!fileName) fileName = strrchr(file, '\\');  // 按 Windows 路径分隔符查找
+    fileName = fileName ? (fileName + 1) : file;     // 无分隔符时直接用完整路径
     // 格式化时间戳和位置信息
     QString prefix = QString("[%1] <%2:%3:%4> ")
                          .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz"))
-                         .arg(file)
+                         .arg(fileName)
                          .arg(func)
                          .arg(line);
 
