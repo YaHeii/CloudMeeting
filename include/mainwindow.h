@@ -5,7 +5,7 @@
  */
 #include <QMainWindow>
 #include "VideoCapture.h"
-#include "ffmpegDecoder.h"
+#include "ffmpegVideoDecoder.h"
 #include "VideoWidget.h"
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
@@ -42,7 +42,7 @@ private:
 
 
     // --- 视频处理链 ---
-    ffmpegDecoder* m_videoDecoder; // 之前的 ffmpegDecoder
+    ffmpegVideoDecoder* m_videoDecoder; // 之前的 ffmpegDecoder
     ffmpegEncoder* m_videoEncoder;
     QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue;//采集队列
     QUEUE_DATA<std::unique_ptr<QImage>>* m_QimageQueue;//QT显示队列

@@ -24,8 +24,9 @@ qt_add_executable(CloudMeeting
         src/DeviceEnumerator.cpp
         src/VideoCapture.cpp
         src/VideoWidget.cpp
-        src/ffmpegDecoder.cpp
+        src/ffmpegVideoDecoder.cpp
         src/ffmpegAudioDecoder.cpp
+        src/ffmpegEncoder.cpp
 
 #        ${HEADERS}
         include/ffmpegAudioDecoder.h
@@ -40,11 +41,12 @@ qt_add_executable(CloudMeeting
         include/VideoCapture.h
         include/VideoWidget.h
         include/AVSmartPtrs.h
-        include/ffmpegDecoder.h
+        include/ffmpegVideoDecoder.h
+        include/ffmpegEncoder.h
+        include/AudioResampleConfig.h
 #        ${UIS}
         ui/mainwindow.ui
-        src/ffmpegEncoder.cpp
-        src/ffmpegEncoder.h
+
 
 
 )
@@ -59,7 +61,7 @@ target_link_directories(CloudMeeting PRIVATE
 
 target_link_libraries(CloudMeeting PRIVATE
         Qt6::Widgets
-
+        Qt6::Multimedia
         # CMake 会在链接目录中自动寻找 avcodec.lib/avcodec.a 等
         avcodec
         avformat
@@ -67,7 +69,6 @@ target_link_libraries(CloudMeeting PRIVATE
         avdevice
         swscale
         swresample
-        Qt6::Multimedia
 )
 
 include(GNUInstallDirs)

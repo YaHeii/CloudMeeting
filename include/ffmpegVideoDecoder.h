@@ -19,19 +19,12 @@ extern "C" {
 #include <libavutil/imgutils.h>
 }
 ////TODO：修改类名为ffmpegVideoDecoder
-class ffmpegDecoder : public QObject{
+class ffmpegVideoDecoder : public QObject{
     Q_OBJECT
 public:
-    explicit ffmpegDecoder(QUEUE_DATA<AVPacketPtr>* packetQueue,QUEUE_DATA<std::unique_ptr<QImage>>*imageQueue,QUEUE_DATA<AVFramePtr>* frameQueue,QObject *parent = nullptr);
-    ~ffmpegDecoder();
-signals:
-    void newFrameAvailable();
-public slots:
-    bool init(AVCodecParameters* params);
+    explicit ffmpegVideoDecoder(QUEUE_DATA<AVPacketPtr>* packetQueue,QUEUE_DATA<std::unique_ptr<QImage>>*imageQueue,QUEUE_DATA<AVFramePtr>* frameQueue,QObject *parent = nullptr);
+    ~ffmpegVideoDecoder();
 
-    void startDecoding();
-
-    void stopDecoding();
 private:
     void clear();
     QUEUE_DATA<AVPacketPtr>* m_packetQueue;//采集队列
@@ -45,6 +38,17 @@ private:
     AVCodecContext* m_codecCtx = nullptr;
     const AVCodec* m_codec = nullptr;
     SwsContext* m_swsCtx = nullptr;
+
+    void decodingVideoLoop();
+signals:
+        void newFrameAvailable();
+    void errorOccurred(const QString &errorText);
+public slots:
+    bool init(AVCodecParameters* params);
+
+    void startDecoding();
+
+    void stopDecoding();
 };
 
 

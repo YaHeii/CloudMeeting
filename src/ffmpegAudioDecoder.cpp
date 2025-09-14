@@ -23,9 +23,18 @@ void ffmpegAudioDecoder::clear() {
     //     delete m_audioSink;
     //     m_audioSink = nullptr;
     // }
-    if (m_codecCtx) avcodec_free_context(&m_codecCtx);
-    if (m_swrCtx) swr_free(&m_swrCtx);
-    m_swrCtx = nullptr;
+    if (m_codecCtx) {
+        avcodec_free_context(&m_codecCtx);
+        m_codecCtx = nullptr;
+    }
+    if (m_swrCtx) {
+        swr_free(&m_swrCtx);
+        m_swrCtx = nullptr;
+    }
+    if (m_fifo) {
+        av_audio_fifo_free(m_fifo);
+        m_fifo = nullptr;
+    }
 }
 
 bool ffmpegAudioDecoder::init(AVCodecParameters *params) {
@@ -41,64 +50,67 @@ bool ffmpegAudioDecoder::init(AVCodecParameters *params) {
     if (avcodec_parameters_to_context(m_codecCtx, params) < 0) { WRITE_LOG("avcodec_parameters_to_context failed"); return false; }
     if (avcodec_open2(m_codecCtx, m_codec, nullptr) < 0) { WRITE_LOG("avcodec_open2 failed"); return false; }
 
-    QAudioFormat format;
-    format.setSampleRate(m_codecCtx->sample_rate);
-    // 使用输入音频的通道数而不是固定值2
-    format.setChannelCount(m_codecCtx->ch_layout.nb_channels); 
-    format.setSampleFormat(QAudioFormat::Int16); // 16位有符号整数
-
-    // m_audioSink = new QAudioSink(QMediaDevices::defaultAudioOutput(), format);
-
-    //初始化重采样
-    m_swrCtx = swr_alloc();
-    av_opt_set_chlayout(m_swrCtx, "in_chlayout", &m_codecCtx->ch_layout, 0);
-    av_opt_set_int(m_swrCtx, "in_sample_rate", m_codecCtx->sample_rate, 0);
-    av_opt_set_sample_fmt(m_swrCtx, "in_sample_fmt", m_codecCtx->sample_fmt, 0);
-
-    // 设置正确的输出通道布局
-    AVChannelLayout out_ch_layout;
-    av_channel_layout_default(&out_ch_layout, format.channelCount());
-    av_opt_set_chlayout(m_swrCtx, "out_chlayout", &out_ch_layout, 0);
-    av_channel_layout_uninit(&out_ch_layout);
-    
-    av_opt_set_int(m_swrCtx, "out_sample_rate", format.sampleRate(), 0);
-    av_opt_set_sample_fmt(m_swrCtx, "out_sample_fmt", AV_SAMPLE_FMT_S16, 0);
-
-    if (swr_init(m_swrCtx) < 0) {
-        WRITE_LOG("swr_init failed");
-        return false;
-    }
     WRITE_LOG("Audio Decoder initialized successfully.");
     return true;
 }
-//// TODO：使用decodingLOOP和stratstartDecoding解耦
-void ffmpegAudioDecoder::startDecoding() {
-    m_isDecoding = true;
-    // m_audioDevice = m_audioSink->start(); //
-    // if (!m_audioDevice) {
-    //     WRITE_LOG("Failed to start audio sink");
-    //     m_isDecoding = false;
-    //     return;
-    // }
 
-    WRITE_LOG("ffmpegAudioDecoder::startDecoding");
+void ffmpegAudioDecoder::setResampleConfig(const AudioResampleConfig& config) {
+    WRITE_LOG("AudioDecoder received encoder config. Frame size: %d, Sample Rate: %d",
+              config.frame_size, config.sample_rate);
+    m_ResampleConfig = config;
 
-    AVFramePtr frame(av_frame_alloc());
-    if (!frame) {
-        WRITE_LOG("ffmpegAudioDecoder::Failed to allocate frame");
-        m_isDecoding = false;
+    // --- 初始化重采样器 ---
+    if(m_swrCtx) swr_free(&m_swrCtx);
+
+    swr_alloc_set_opts2(&m_swrCtx,
+                        &config.ch_layout,      // 目标通道布局
+                        config.sample_fmt,      // 目标采样格式
+                        config.sample_rate,     // 目标采样率
+                        &m_codecCtx->ch_layout, // 源通道布局
+                        m_codecCtx->sample_fmt, // 源采样格式
+                        m_codecCtx->sample_rate,  // 源采样率
+                        0, nullptr);
+    if (!m_swrCtx || swr_init(m_swrCtx) < 0) {
+        emit errorOccurred("Failed to initialize audio resampler.");
         return;
     }
-    
-    // 创建一个足够大的缓冲区来存放重采样后的数据
-    uint8_t* resampled_buffer = (uint8_t*)av_malloc(48000 * 2 * 2); // 1秒的数据
-    if (!resampled_buffer) {
-        WRITE_LOG("ffmpegAudioDecoder::Failed to allocate resampled buffer");
+
+    // --- 初始化FIFO ---
+    if(m_fifo) av_audio_fifo_free(m_fifo);
+    m_fifo = av_audio_fifo_alloc(config.sample_fmt, config.ch_layout.nb_channels, 1);
+    if (!m_fifo) {
+        emit errorOccurred("Failed to allocate audio FIFO.");
+        return;
+    }
+
+    m_isConfigReady = true; // 标记为配置就绪
+}
+
+void ffmpegAudioDecoder::startDecoding() {
+    m_isDecoding = true;
+    decodingAudioLoop();
+}
+void ffmpegAudioDecoder::stopDecoding() {
+    m_isDecoding = false;
+}
+
+void ffmpegAudioDecoder::decodingAudioLoop() {
+    WRITE_LOG("ffmpegAudioDecoder::startDecoding");
+    AVFramePtr decoded_frame(av_frame_alloc());
+    AVFramePtr resampledFrame(av_frame_alloc());
+
+    if (!decoded_frame || !resampledFrame) {
+        emit errorOccurred("ffmpegAudioDecoder::Failed to allocate frame");
         m_isDecoding = false;
         return;
     }
 
     while (m_isDecoding) {
+
+        if (!m_isConfigReady) { // 如果编码器未就绪，等待
+            QThread::msleep(10);
+            continue;
+        }
         AVPacketPtr packet;
         if (!m_packetQueue->dequeue(packet)) {
             WRITE_LOG("ffmpegAudioDecoder::Deque Packet TimeOut");
@@ -118,43 +130,43 @@ void ffmpegAudioDecoder::startDecoding() {
             continue;
         }
 
-        int receiveResult = 0;
-        while (m_isDecoding && (receiveResult = avcodec_receive_frame(m_codecCtx, frame.get())) == 0) {
+        while (avcodec_receive_frame(m_codecCtx, decoded_frame.get()) == 0) {
             // 解码成功，进行重采样
-            int resampled_data_size = swr_convert(m_swrCtx, &resampled_buffer, frame->nb_samples,
-                                                  (const uint8_t**)frame->data, frame->nb_samples);
-            
-            if (resampled_data_size < 0) {
-                char errbuf[1024] = {0};
-                av_strerror(resampled_data_size, errbuf, sizeof(errbuf));
-                WRITE_LOG("ffmpegAudioDecoder::swr_convert failed: %s", errbuf);
-                continue;
-            }
-            m_frameQueue->enqueue(std::move(frame));
-            // if (resampled_data_size > 0 && m_audioDevice) {
-            //     // 将重采样后的PCM数据写入音频设备进行播放
-            //     qint64 written = m_audioDevice->write((const char*)resampled_buffer,
-            //                                          resampled_data_size * 2 * sizeof(int16_t));
-            //     if (written < 0) {
-            //         WRITE_LOG("ffmpegAudioDecoder::Failed to write to audio device: %s",
-            //                  m_audioDevice->errorString().toLocal8Bit().data());
-            //     }
-            // }
-        }
-        
-        if (receiveResult < 0 && receiveResult != AVERROR(EAGAIN) && receiveResult != AVERROR_EOF) {
-            char errbuf[1024] = {0};
-            av_strerror(receiveResult, errbuf, sizeof(errbuf));
-            WRITE_LOG("ffmpegAudioDecoder::avcodec_receive_frame failed: %s", errbuf);
-        }
-    }
+            resampledFrame->ch_layout = m_ResampleConfig.ch_layout;
+            resampledFrame->sample_rate = m_ResampleConfig.sample_rate;
+            resampledFrame->format = m_ResampleConfig.sample_fmt;
+            int ret = swr_convert_frame(m_swrCtx, resampledFrame.get(), decoded_frame.get());
+            if (ret < 0) continue;
 
-    // m_audioSink->stop();
-    av_free(resampled_buffer);
-    resampled_buffer = nullptr;
+            // --- 写入FIFO ---
+            av_audio_fifo_write(m_fifo, (void**)resampledFrame->data, resampledFrame->nb_samples);
+
+            // --- 读取固定帧 ---
+            while (av_audio_fifo_size(m_fifo) >= m_ResampleConfig.frame_size) {
+                AVFramePtr sendFrame(av_frame_alloc());
+
+                // 设置帧参数
+                sendFrame->nb_samples = m_ResampleConfig.frame_size;
+                sendFrame->ch_layout = m_ResampleConfig.ch_layout;
+                sendFrame->format = m_ResampleConfig.sample_fmt;
+                sendFrame->sample_rate = m_ResampleConfig.sample_rate;
+
+                if (av_frame_get_buffer(sendFrame.get(), 0) < 0) break;
+
+                av_audio_fifo_read(m_fifo, (void**)sendFrame->data, m_ResampleConfig.frame_size);
+
+                // --- 计算PTS ---
+                sendFrame->pts = m_nextPts;
+                m_nextPts += sendFrame->nb_samples;
+
+                // --- 入队给编码器 ---
+                m_frameQueue->enqueue(std::move(sendFrame));
+            }
+        }
+
+    }
     WRITE_LOG("Audio decoding loop finished.");
 }
 
-void ffmpegAudioDecoder::stopDecoding() {
-    m_isDecoding = false;
-}
+
+

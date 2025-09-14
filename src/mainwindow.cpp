@@ -5,6 +5,8 @@
 #include "netheader.h"
 #include "screen.h"
 #include "DeviceEnumerator.h"
+#include <QMessageBox>
+#include "AudioResampleConfig.h"
 
 QRect MainWindow::pos = QRect(-1,-1,-1,-1);
 // extern LogQueue *logqueue;
@@ -13,10 +15,10 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
-    LogQueue::GetInstance().start();
-
-    WRITE_LOG("main:",QThread::currentThread());
     qRegisterMetaType<MSG_TYPE>();
+    qRegisterMetaType<AudioResampleConfig>();
+
+    LogQueue::GetInstance().start();
 
     WRITE_LOG("-------------------------Application Start---------------------------");
     WRITE_LOG("main UI thread id: 0x%p", QThread::currentThreadId());
@@ -66,7 +68,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_audioDecoderThread->start();
     //视频解码线程
     m_videoDecoderThread = new QThread(this);
-    m_videoDecoder = new ffmpegDecoder(m_videoPacketQueue, m_QimageQueue, m_videoFrameQueue);
+    m_videoDecoder = new ffmpegVideoDecoder(m_videoPacketQueue, m_QimageQueue, m_videoFrameQueue);
     m_videoDecoder->moveToThread(m_videoDecoderThread);
     m_videoDecoderThread->start();
 
@@ -91,23 +93,34 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_capture, &VideoCapture::deviceOpenSuccessfully, this, &MainWindow::onDeviceOpened);
 
     //// 视频
-    //// 解码器初始化成功，开始解码
-    connect(m_videoDecoderThread, &QThread::started, m_videoDecoder, &ffmpegDecoder::startDecoding);
-    //// 每解出一帧通知主线程
-    connect(m_videoDecoder, &ffmpegDecoder::newFrameAvailable, this, &MainWindow::onNewFrameAvailable, Qt::QueuedConnection);
+    connect(m_videoDecoder, &ffmpegVideoDecoder::newFrameAvailable, this, &MainWindow::onNewFrameAvailable, Qt::QueuedConnection);
 
-    connect(m_capture, &VideoCapture::errorOccurred, this, &MainWindow::handleError);
-
-    // 音频
-    // 连接音频链的信号槽
+    //// 音频
+    connect(m_audioEncoder, &ffmpegEncoder::audioEncoderReady,m_audioDecoder, &ffmpegAudioDecoder::setResampleConfig,Qt::QueuedConnection);
     connect(m_audioDecoderThread, &QThread::started, m_audioDecoder, &ffmpegAudioDecoder::startDecoding);
-    // connect(m_audioDecoder, &ffmpegAudioDecoder::errorOccurred, this, &MainWindow::onAudioDecodeError);
-    // connect(m_capture, &VideoCapture::errorOccurred, this, &MainWindow::onCaptureError);
+    connect(m_audioEncoder, &ffmpegEncoder::audioEncoderReady,m_audioDecoder, &ffmpegAudioDecoder::setResampleConfig);
+
+    // connect(m_videoEncoder, &ffmpegEncoder::initializationSuccess, this, [this](){
+    //     QMetaObject::invokeMethod(m_videoEncoder, "startEncoding", Qt::QueuedConnection);
+    // });
+    //
+    // // 当音频编码器初始化成功后，再启动它的编码循环
+    // connect(m_audioEncoder, &ffmpegEncoder::initializationSuccess, this, [this](){
+    //     QMetaObject::invokeMethod(m_audioEncoder, "startEncoding", Qt::QueuedConnection);
+    // });
+    //errorOccurred处理
+    connect(m_videoDecoder, &ffmpegVideoDecoder::errorOccurred, this, &MainWindow::handleError);
+    connect(m_audioDecoder, &ffmpegAudioDecoder::errorOccurred, this, &MainWindow::handleError);
+    connect(m_audioEncoder, &ffmpegEncoder::errorOccurred, this, &MainWindow::handleError);
+    connect(m_videoEncoder, &ffmpegEncoder::errorOccurred, this, &MainWindow::handleError);
+    connect(m_capture, &VideoCapture::errorOccurred, this, &MainWindow::handleError);
 
     // 线程结束后，自动清理工作对象和线程本身
     connect(m_CaptureThread, &QThread::finished, m_capture, &QObject::deleteLater);
     connect(m_videoDecoderThread, &QThread::finished, m_videoDecoder, &QObject::deleteLater);
     connect(m_audioDecoderThread, &QThread::finished, m_audioDecoder, &QObject::deleteLater);
+    connect(m_audioEncoderThread, &QThread::finished, m_audioEncoder, &QObject::deleteLater);
+    connect(m_videoEncoderThread, &QThread::finished, m_videoEncoder, &QObject::deleteLater);
 }
 
 MainWindow::~MainWindow()
@@ -192,21 +205,24 @@ void MainWindow::on_openVideo_clicked() {
     }
 }
 
-// void on_openAudioButton_clicked() {
-//
-// }
 void MainWindow::onDeviceOpened(AVCodecParameters* vParams, AVCodecParameters* aParams)
 {
-    WRITE_LOG("Main thread: Device opened. Initializing decoder...");
+    WRITE_LOG("Main thread: Device opened. Initializing...");
     if (vParams) {
-        WRITE_LOG("Initializing video decoder");
+        WRITE_LOG("Initializing video pipeline");
         QMetaObject::invokeMethod(m_videoDecoder, "init", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, vParams));
+        QMetaObject::invokeMethod(m_videoEncoder, "initVideoEncoder", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, vParams));
         QMetaObject::invokeMethod(m_videoDecoder, "startDecoding", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(m_videoEncoder, "startEncoding", Qt::QueuedConnection);
     }
     if (aParams) {
-        WRITE_LOG("Initializing audio decoder");
+
+        // 只需要初始化，startDecoding/Encoding 会在配置完成后自动处理
+        WRITE_LOG("Initializing audio pipeline");
         QMetaObject::invokeMethod(m_audioDecoder, "init", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, aParams));
+        QMetaObject::invokeMethod(m_audioEncoder, "initAudioEncoder", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, aParams));
         QMetaObject::invokeMethod(m_audioDecoder, "startDecoding", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(m_audioEncoder, "startEncoding", Qt::QueuedConnection);
     }
     QMetaObject::invokeMethod(m_capture, "startReading", Qt::QueuedConnection);
 }
@@ -219,14 +235,26 @@ void MainWindow::onNewFrameAvailable()
 {
     // 这是在UI主线程中执行的
     std::unique_ptr<QImage> image;
-    if (m_videoFrameQueue->dequeue(image)) {
+    if (m_QimageQueue->dequeue(image)) {
         if (image&&!image->isNull()) {
             m_videoWidget->updateFrame(image.get());
         }
     }
 }
+
 void MainWindow::handleError(const QString &errorText) {
     WRITE_LOG(errorText.toLocal8Bit());
+
+    // 创建并显示错误信息弹窗
+    QMessageBox errorBox;
+    errorBox.setIcon(QMessageBox::Critical);
+    errorBox.setWindowTitle("错误");
+    errorBox.setText(errorText);
+    errorBox.setStandardButtons(QMessageBox::Ok);
+    errorBox.setDefaultButton(QMessageBox::Ok);
+
+    // 显示模态对话框
+    errorBox.exec();
 }
 void MainWindow::handleDeviceOpened()
 {

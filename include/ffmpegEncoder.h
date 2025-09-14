@@ -8,9 +8,11 @@
 #include <QObject>
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
+#include "AudioResampleConfig.h"
 
 extern "C"{
 #include <libavcodec/avcodec.h>
+#include <libavutil/opt.h>
 }
 
 class ffmpegEncoder :public QObject{
@@ -30,9 +32,10 @@ private:
     AVCodecContext* m_codecCtx = nullptr;
     AVMediaType m_mediaType;
 signals:
-    void encoderInitialized(AVCodecContext* params);
+    void audioEncoderReady(const AudioResampleConfig& config);
     void errorOccurred(const QString& errorText);
-
+    void encoderInitialized(AVCodecContext* codecCtx);
+    // void initializationSuccess();
 public slots:
     bool initVideoEncoder(AVCodecParameters* vparams);
     bool initAudioEncoder(AVCodecParameters* aparams);
