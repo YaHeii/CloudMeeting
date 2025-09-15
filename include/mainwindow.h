@@ -11,6 +11,7 @@
 #include "AVSmartPtrs.h"
 #include "ffmpegAudioDecoder.h"
 #include "ffmpegEncoder.h"
+#include "RtmpPublisher.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -47,20 +48,22 @@ private:
     QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue;//采集队列
     QUEUE_DATA<std::unique_ptr<QImage>>* m_QimageQueue;//QT显示队列
     QUEUE_DATA<AVFramePtr>* m_videoFrameQueue;//网络传输帧队列
-    QUEUE_DATA<AVPacketPtr>* m_videoSendPacketQueue;//发送队列
+
 
     // --- 音频处理链 ---
     ffmpegAudioDecoder* m_audioDecoder;
     ffmpegEncoder* m_audioEncoder;
     QUEUE_DATA<AVPacketPtr>* m_audioPacketQueue;
     QUEUE_DATA<AVFramePtr>* m_audioFrameQueue;//网络传输帧队列
-    QUEUE_DATA<AVPacketPtr>* m_audioSendPacketQueue;//发送队列
 
+    RtmpPublisher* m_rtmpPublisher;
+    QUEUE_DATA<AVPacketPtr>* m_publishPacketQueue;//发送队列
     // --- 线程 ---
     QThread* m_videoDecoderThread;
     QThread* m_audioDecoderThread;
     QThread* m_videoEncoderThread;
     QThread* m_audioEncoderThread;
+    QThread* m_rtmpPublisherThread;
 
     VideoWidget* m_videoWidget;
     QUEUE_DATA<AVPacketPtr>* m_packetQueue;//采集队列
@@ -68,8 +71,9 @@ private:
 private slots:
     ////TODO:开启视频和开启音频按钮触发后转变为关闭视频和关闭音频
     void on_openVideo_clicked();
-    // void on_openAudioButton_clicked();
+    void on_openAudio_clicked();
     void on_exitmeetBtn_clicked();//暂时使用退出会议来关闭视频音频
+    void on_joinmeetBtn_clicked();
 
     void onNewFrameAvailable();
 

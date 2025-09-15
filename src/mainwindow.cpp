@@ -50,10 +50,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_videoPacketQueue = new QUEUE_DATA<AVPacketPtr>();
     m_QimageQueue = new QUEUE_DATA<std::unique_ptr<QImage>>();
     m_videoFrameQueue = new QUEUE_DATA<AVFramePtr>();
-    m_videoSendPacketQueue = new QUEUE_DATA<AVPacketPtr>();
     m_audioPacketQueue = new QUEUE_DATA<AVPacketPtr>();
     m_audioFrameQueue = new QUEUE_DATA<AVFramePtr>();
-    m_audioSendPacketQueue = new QUEUE_DATA<AVPacketPtr>();
+    m_publishPacketQueue = new QUEUE_DATA<AVPacketPtr>();
 
     //采集线程
     m_CaptureThread = new QThread(this);
@@ -74,14 +73,20 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 音频编码线程
     m_audioEncoderThread = new QThread(this);
-    m_audioEncoder = new ffmpegEncoder(m_audioFrameQueue, m_audioSendPacketQueue);
+    m_audioEncoder = new ffmpegEncoder(m_audioFrameQueue, m_publishPacketQueue);
     m_audioEncoder->moveToThread(m_audioEncoderThread);
     m_audioEncoderThread->start();
     // 视频编码线程
     m_videoEncoderThread = new QThread(this);
-    m_videoEncoder = new ffmpegEncoder(m_videoFrameQueue, m_videoSendPacketQueue);
+    m_videoEncoder = new ffmpegEncoder(m_videoFrameQueue, m_publishPacketQueue);
     m_videoEncoder->moveToThread(m_videoEncoderThread);
     m_videoEncoderThread->start();
+
+    //RTMP推流线程
+    m_rtmpPublisherThread = new QThread(this);
+    m_rtmpPublisher = new RtmpPublisher(m_publishPacketQueue);
+    m_rtmpPublisherThread->moveToThread(m_rtmpPublisherThread);
+    m_rtmpPublisherThread->start();
 
     //获取可用设备
     QStringList videoDevices = DeviceEnumerator::getDevices(MediaType::Video);
@@ -175,7 +180,7 @@ void MainWindow::on_openVideo_clicked() {
 
     if (m_isVideoRunning) {
 
-        QMetaObject::invokeMethod(m_capture, "closeDevice", Qt::BlockingQueuedConnection);
+        QMetaObject::invokeMethod(m_capture, "closeVideo", Qt::BlockingQueuedConnection);
 
         // 2. 清空队列
         m_videoPacketQueue->clear();
@@ -187,16 +192,12 @@ void MainWindow::on_openVideo_clicked() {
         qDebug() << "Video stopped.";
 
     } else {
-
         QString videoDevice = ui->videoDeviceComboBox->currentText();
         if (videoDevice.isEmpty()) {
             qWarning() << "No video device selected!";
             return;
         }
-        QString audioDevice = ui->audioDevicecomboBox->currentText();
-        QMetaObject::invokeMethod(m_capture, "openDevice", Qt::QueuedConnection,
-                                  Q_ARG(QString, videoDevice),
-                                  Q_ARG(QString, audioDevice));
+        QMetaObject::invokeMethod(m_capture, "openVideo", Qt::QueuedConnection,Q_ARG(QString, videoDevice));
 
         // 3. 更新UI和状态
         ui->openVideo->setText("关闭视频");
@@ -204,7 +205,36 @@ void MainWindow::on_openVideo_clicked() {
         qDebug() << "Starting video...";
     }
 }
+void MainWindow::on_openAudio_clicked()
+{
+    if (m_isAudioRunning) {
 
+        QMetaObject::invokeMethod(m_capture, "closeAudio", Qt::BlockingQueuedConnection);
+
+        // 2. 清空队列
+        m_audioPacketQueue->clear();
+        m_audioFrameQueue->clear();
+
+        // 3. 更新UI和状态
+        ui->openAudio->setText("打开麦克风");
+        m_isAudioRunning = false;
+        qDebug() << "Audio stopped.";
+
+    } else {
+        QString videoDevice = ui->videoDeviceComboBox->currentText();
+        if (videoDevice.isEmpty()) {
+            qWarning() << "No video device selected!";
+            return;
+        }
+        QString audioDevice = ui->audioDevicecomboBox->currentText();
+        QMetaObject::invokeMethod(m_capture, "openAudio", Qt::QueuedConnection,Q_ARG(QString, audioDevice));
+
+        // 3. 更新UI和状态
+        ui->openAudio->setText("关闭麦克风");
+        m_isAudioRunning = true;
+        qDebug() << "Starting video...";
+    }
+}
 void MainWindow::onDeviceOpened(AVCodecParameters* vParams, AVCodecParameters* aParams)
 {
     WRITE_LOG("Main thread: Device opened. Initializing...");
@@ -226,7 +256,25 @@ void MainWindow::onDeviceOpened(AVCodecParameters* vParams, AVCodecParameters* a
     }
     QMetaObject::invokeMethod(m_capture, "startReading", Qt::QueuedConnection);
 }
+void MainWindow::on_joinmeetBtn_clicked(){
+    QString rtmpUrl = "rtmp://your-server/live/stream_key";
 
+    AVCodecContext* videoCtx = m_videoEncoder->getCodecContext();
+    AVCodecContext* audioCtx = m_audioEncoder->getCodecContext();
+
+    if (!videoCtx || !audioCtx) {
+        QMessageBox::warning(this, "Error", "Encoders are not ready yet.");
+        return;
+    }
+
+    // 使用 invokeMethod 异步调用 init 和 startPublishing
+    QMetaObject::invokeMethod(m_rtmpPublisher, "init", Qt::QueuedConnection,
+                              Q_ARG(QString, rtmpUrl),
+                              Q_ARG(AVCodecContext*, videoCtx),
+                              Q_ARG(AVCodecContext*, audioCtx));
+
+    QMetaObject::invokeMethod(m_rtmpPublisher, "startPublishing", Qt::QueuedConnection);
+}
 void MainWindow::on_exitmeetBtn_clicked(){
 
     QMetaObject::invokeMethod(m_CaptureThread, "closeDevice", Qt::QueuedConnection);

@@ -46,7 +46,8 @@ qt_add_executable(CloudMeeting
         include/AudioResampleConfig.h
 #        ${UIS}
         ui/mainwindow.ui
-
+        include/RtmpPublisher.cpp
+        include/RtmpPublisher.h
 
 
 )

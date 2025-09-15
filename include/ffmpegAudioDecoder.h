@@ -39,9 +39,9 @@ private:
     SwrContext* m_swrCtx = nullptr; // 用于音频重采样
 
     AVAudioFifo *m_fifo = nullptr;
-    AVCodecContext *m_encoderCtx = nullptr; // 需要拿到编码器的上下文来获取 frame_size
-    int64_t m_nextPts = 0;                   // 用于生成新的PTS
-    AudioResampleConfig m_ResampleConfig;     // <--- 存储从编码器收到的配置
+    AVCodecContext *m_encoderCtx = nullptr;
+    int64_t m_fifoBasePts = AV_NOPTS_VALUE;
+    AudioResampleConfig m_ResampleConfig;
 
     // Qt Audiosink test
     // QAudioSink* m_audioSink = nullptr;

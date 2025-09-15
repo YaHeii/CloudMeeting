@@ -82,7 +82,7 @@ void ffmpegAudioDecoder::setResampleConfig(const AudioResampleConfig& config) {
         emit errorOccurred("Failed to allocate audio FIFO.");
         return;
     }
-
+    m_fifoBasePts = AV_NOPTS_VALUE;
     m_isConfigReady = true; // 标记为配置就绪
 }
 
@@ -135,6 +135,15 @@ void ffmpegAudioDecoder::decodingAudioLoop() {
             resampledFrame->ch_layout = m_ResampleConfig.ch_layout;
             resampledFrame->sample_rate = m_ResampleConfig.sample_rate;
             resampledFrame->format = m_ResampleConfig.sample_fmt;
+
+            // --- 计算PTS ---
+            //如果FIFO是空的，那么这个解码帧是音频流的起始帧，那么设置PTS为后续基准PTS
+            if (m_fifoBasePts == AV_NOPTS_VALUE && decoded_frame->pts != AV_NOPTS_VALUE) {
+                if(av_audio_fifo_size(m_fifo) == 0){
+                    m_fifoBasePts = decoded_frame->pts;
+                }
+            }
+
             int ret = swr_convert_frame(m_swrCtx, resampledFrame.get(), decoded_frame.get());
             if (ret < 0) continue;
 
@@ -156,9 +165,12 @@ void ffmpegAudioDecoder::decodingAudioLoop() {
                 av_audio_fifo_read(m_fifo, (void**)sendFrame->data, m_ResampleConfig.frame_size);
 
                 // --- 计算PTS ---
-                sendFrame->pts = m_nextPts;
-                m_nextPts += sendFrame->nb_samples;
-
+                if (m_fifoBasePts != AV_NOPTS_VALUE) {
+                    sendFrame->pts = m_fifoBasePts;
+                    m_fifoBasePts += sendFrame->nb_samples;
+                }else {
+                    sendFrame->pts = AV_NOPTS_VALUE;
+                }
                 // --- 入队给编码器 ---
                 m_frameQueue->enqueue(std::move(sendFrame));
             }

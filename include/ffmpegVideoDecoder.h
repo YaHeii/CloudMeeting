@@ -41,7 +41,7 @@ private:
 
     void decodingVideoLoop();
 signals:
-        void newFrameAvailable();
+    void newFrameAvailable();
     void errorOccurred(const QString &errorText);
 public slots:
     bool init(AVCodecParameters* params);

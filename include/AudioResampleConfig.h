@@ -1,6 +1,9 @@
-//
-// Created by lenovo on 25-9-14.
-//
+/**
+ *音频编码器重采样通道配置
+ *madebyYahei
+ */
+
+
 
 #ifndef AUDIORESAMPLECONFIG_H
 #define AUDIORESAMPLECONFIG_H

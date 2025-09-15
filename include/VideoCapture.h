@@ -31,8 +31,11 @@ public:
     void setPacketQueue(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue);
     // AVCodecParameters* getVideoCodecParameters();
     // AVCodecParameters* getAudioCodecParameters();
-
+    void openAudio(const QString &audioDeviceName);
+    void openVideo(const QString &videoDeviceName);
     void closeDevice();
+    void closeAudio();
+    void closeVideo();
 signals:
     void deviceOpenSuccessfully(AVCodecParameters* vparams,AVCodecParameters* aparams);
 
