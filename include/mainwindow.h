@@ -4,7 +4,7 @@
  *madebyYahei
  */
 #include <QMainWindow>
-#include "VideoCapture.h"
+#include "Capture.h"
 #include "ffmpegVideoDecoder.h"
 #include "VideoWidget.h"
 #include "ThreadSafeQueue.h"
@@ -38,9 +38,12 @@ private:
     Ui::MainWindow *ui;
     quint32 mainip; //主屏幕显示的IP图像
 
-    QThread *m_CaptureThread;
-    VideoCapture *m_capture;
-
+    // --- 视频采集 ---
+    QThread *m_videoCaptureThread;
+    Capture *m_videoCapture;
+    // --- 音频采集
+    QThread *m_audioCaptureThread;
+    Capture *m_audioCapture;
 
     // --- 视频处理链 ---
     ffmpegVideoDecoder* m_videoDecoder; // 之前的 ffmpegDecoder
@@ -73,7 +76,7 @@ private slots:
     void on_openVideo_clicked();
     void on_openAudio_clicked();
     void on_exitmeetBtn_clicked();//暂时使用退出会议来关闭视频音频
-    void on_joinmeetBtn_clicked();
+    void on_createmeetBtn_clicked();
 
     void onNewFrameAvailable();
 

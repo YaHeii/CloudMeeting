@@ -128,7 +128,7 @@ void ffmpegEncoder::encodingLoop(){
                 break;
             }
             packet->stream_index = (m_mediaType == AVMEDIA_TYPE_VIDEO)? 0 : 1;
-            WRITE_LOG("Encoded %s packet with size %d", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"), packet->size);
+            // WRITE_LOG("Encoded %s packet with size %d", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"), packet->size);
             m_packetQueue->enqueue(std::move(packet));
         }
     }

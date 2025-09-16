@@ -22,11 +22,12 @@ qt_add_executable(CloudMeeting
         src/netheader.cpp
         src/screen.cpp
         src/DeviceEnumerator.cpp
-        src/VideoCapture.cpp
+        src/Capture.cpp
         src/VideoWidget.cpp
         src/ffmpegVideoDecoder.cpp
         src/ffmpegAudioDecoder.cpp
         src/ffmpegEncoder.cpp
+        src/RtmpPublisher.cpp
 
 #        ${HEADERS}
         include/ffmpegAudioDecoder.h
@@ -38,20 +39,18 @@ qt_add_executable(CloudMeeting
         include/netheader.h
         include/screen.h
         include/ThreadSafeQueue.h
-        include/VideoCapture.h
+        include/Capture.h
         include/VideoWidget.h
         include/AVSmartPtrs.h
         include/ffmpegVideoDecoder.h
         include/ffmpegEncoder.h
         include/AudioResampleConfig.h
-#        ${UIS}
-        ui/mainwindow.ui
-        include/RtmpPublisher.cpp
         include/RtmpPublisher.h
 
-
+        #        ${UIS}
+        ui/mainwindow.ui
 )
-
+target_compile_definitions(CloudMeeting PRIVATE AV_DLL)
 target_include_directories(CloudMeeting PRIVATE SYSTEM
         ${FFMPEG_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -70,6 +69,7 @@ target_link_libraries(CloudMeeting PRIVATE
         avdevice
         swscale
         swresample
+        winmm
 )
 
 include(GNUInstallDirs)

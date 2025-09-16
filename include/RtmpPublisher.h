@@ -16,13 +16,13 @@ extern "C" {
 #include <libavutil/time.h>
 }
 
-class RtmpPublisher {
+class RtmpPublisher : public QObject{
     Q_OBJECT
 public:
     explicit RtmpPublisher(QUEUE_DATA<AVPacketPtr>* encodedPacketQueue,QObject *parent = nullptr);
     ~RtmpPublisher();
-    Q_INVOKABLE bool init(const QString& rtmpUrl, AVCodecContext* vCodecCtx, AVCodecContext* aCodecCtx);
-    Q_INVOKABLE void clear();
+    bool init(const QString& rtmpUrl, AVCodecContext* vCodecCtx, AVCodecContext* aCodecCtx);
+    void clear();
 private:
     QUEUE_DATA<AVPacketPtr>* m_encodedPacketQueue; // 编码后数据包的输入队列
 

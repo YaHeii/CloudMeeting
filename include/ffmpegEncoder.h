@@ -20,6 +20,9 @@ class ffmpegEncoder :public QObject{
 public:
     explicit ffmpegEncoder(QUEUE_DATA<AVFramePtr>* frameQueue,QUEUE_DATA<AVPacketPtr>* packetQueue,QObject* parent = nullptr);
     ~ffmpegEncoder();
+
+    AVCodecContext* getCodecContext() const { return m_codecCtx; }
+
 private:
     void clear();
     void encodingLoop();

@@ -4,7 +4,7 @@
 *    QUEUE_DATA<AVPacketPtr>* m_VideopacketQueue = nullptr;
      QUEUE_DATA<AVPacketPtr>* m_AudiopacketQueue = nullptr;
  */
-
+//// TODO:对这个类进行重构
 #ifndef FFMPEGINPUT_H
 #define FFMPEGINPUT_H
 #include <QObject>
@@ -15,6 +15,7 @@ extern "C"{
 #include <libavutil/avutil.h>
 #include <libavdevice/avdevice.h>
 #include <libavformat/avformat.h>
+#include <libavutil/time.h>
 }
 
 enum class MediaType {
@@ -22,20 +23,14 @@ enum class MediaType {
     Audio
 };
 
-class VideoCapture : public QObject{
+class Capture : public QObject{
     Q_OBJECT
 public:
-    explicit VideoCapture(QObject* parent = nullptr);
-    ~VideoCapture();
+    explicit Capture(QObject* parent = nullptr);
+    ~Capture();
+
 
     void setPacketQueue(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue);
-    // AVCodecParameters* getVideoCodecParameters();
-    // AVCodecParameters* getAudioCodecParameters();
-    void openAudio(const QString &audioDeviceName);
-    void openVideo(const QString &videoDeviceName);
-    void closeDevice();
-    void closeAudio();
-    void closeVideo();
 signals:
     void deviceOpenSuccessfully(AVCodecParameters* vparams,AVCodecParameters* aparams);
 
@@ -43,17 +38,23 @@ signals:
 
 public slots:
     void openDevice(const QString &videoDeviceName, const QString &audioDeviceName);
-
+    void closeDevice();
     void startReading();
+    void doReadFrame();
     void stopReading();
+    void openAudio(const QString &audioDeviceName);
+    void openVideo(const QString &videoDeviceName);
 private:
     AVFormatContext* m_FormatCtx = nullptr;
     int m_videoStreamIndex = -1;
     int m_audioStreamIndex = -1;
 
-    volatile bool m_isReading = false;
-    static void initializeFFmpeg();
+    AVCodecParameters* vParams = nullptr;
+    AVCodecParameters* aParams = nullptr;
 
+    std::atomic<bool> m_isReading = false;
+    static void initializeFFmpeg();
+    static int64_t startTime;
     QMutex m_queueMutex;  // 保护队列指针访问的互斥锁
     QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue = nullptr;
     QUEUE_DATA<AVPacketPtr>* m_audioPacketQueue = nullptr;

@@ -5,7 +5,7 @@
  *使用ffmpeg自动解析本机的媒体数据源
  */
 #include <QStringList>
-#include "VideoCapture.h"
+#include "Capture.h"
 
 class DeviceEnumerator
 {
