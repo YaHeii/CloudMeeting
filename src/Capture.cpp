@@ -28,11 +28,10 @@ Capture::~Capture() {
 void Capture::setPacketQueue(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue)
 {
     // 线程安全地设置队列指针
-    QMutexLocker locker(&m_queueMutex);
+    QMutexLocker locker(&m_workMutex);
     m_videoPacketQueue = videoQueue;
     m_audioPacketQueue = audioQueue;
 }
-
 
 void Capture::openDevice(const QString &videoDeviceName, const QString &audioDeviceName) {
     if (m_FormatCtx) {
@@ -42,7 +41,8 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
     const AVInputFormat *inputFormat = nullptr;
     AVDictionary *options = nullptr;
     QString deviceUrl;
-
+    m_videoDeviceName = videoDeviceName;
+    m_audioDeviceName = audioDeviceName;
 #ifdef Q_OS_WIN
     // Windows 使用 dshow
     inputFormat = av_find_input_format("dshow");
@@ -116,6 +116,7 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
     WRITE_LOG("Device opened successfully.");
     if (m_videoStreamIndex >= 0) {
         WRITE_LOG("Video stream index:", m_videoStreamIndex);
+        m_isVideo = true;
         AVCodecParameters* vParams = m_FormatCtx->streams[m_videoStreamIndex]->codecpar;
         WRITE_LOG("Video codec: %1", QString("Codec ID: %1").arg(vParams->codec_id));
         WRITE_LOG("Video format: %1x%2", QString("%1x%2").arg(vParams->width).arg(vParams->height));
@@ -126,6 +127,7 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
     if (m_audioStreamIndex >= 0) {
         WRITE_LOG("Audio stream index:", m_audioStreamIndex);
         AVCodecParameters* aParams = m_FormatCtx->streams[m_audioStreamIndex]->codecpar;
+        m_isAudio = true;
         WRITE_LOG("Audio codec: %1", QString("Codec ID: %1").arg(aParams->codec_id));
         // WRITE_LOG(QString("Audio channels: %1").arg(aParams->channels));
     } else {
@@ -136,6 +138,30 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
     emit deviceOpenSuccessfully(vParams, aParams);
 }
 
+void Capture::openAudio(const QString &audioDeviceName) {
+    if (m_isVideo) {
+        openDevice(m_videoDeviceName, audioDeviceName);
+    }else {
+        openDevice(nullptr, audioDeviceName);
+    }
+}
+
+void Capture::openVideo(const QString &VideoDeviceName) {
+    if (m_isAudio) {
+        openDevice(VideoDeviceName, m_audioDeviceName);
+    }else {
+        openDevice(VideoDeviceName, nullptr);
+    }
+}
+
+void Capture::closeAudio() {
+    closeDevice();
+    openVideo(m_videoDeviceName);
+}
+void Capture::closeVideo() {
+    closeDevice();
+    openAudio(m_audioDeviceName);
+}
 void Capture::startReading() {
     if (!m_FormatCtx) {
         WRITE_LOG("Failed to start reading - format context is null.");
@@ -147,6 +173,7 @@ void Capture::startReading() {
     }
     WRITE_LOG("Starting to read frames...");
     m_isReading = true;
+    m_startTime = av_gettime();
     QMetaObject::invokeMethod(this, "doReadFrame", Qt::QueuedConnection);
 }
 
@@ -155,20 +182,26 @@ void Capture::doReadFrame() {
         WRITE_LOG("Reading loop gracefully stopped.");
         return;
     }
+    {
+        QMutexLocker locker(&m_workMutex);
+        m_isDoingWork = true;
+    }
+    auto work_guard = [this]() {
+        QMutexLocker locker(&m_workMutex);
+        m_isDoingWork = false;
+        m_workCond.wakeAll();
+    };
     // 线程安全地获取队列指针
     QUEUE_DATA<AVPacketPtr>* videoQueue = nullptr;
     QUEUE_DATA<AVPacketPtr>* audioQueue = nullptr;
-    {
-        QMutexLocker locker(&m_queueMutex);
+
         videoQueue = m_videoPacketQueue;
         audioQueue = m_audioPacketQueue;
-    }
 
     if (!videoQueue || !audioQueue) {
         WRITE_LOG("Packet queue NOT SET.");
         return;
     }
-    int64_t startTime = av_gettime();
     qDebug("isReading");
     AVPacketPtr packet(av_packet_alloc());
     if (!packet) {
@@ -196,7 +229,7 @@ void Capture::doReadFrame() {
         // 获取当前时间
         int64_t now_time = av_gettime();
         // 计算从开始到现在的时长（微秒）
-        int64_t pts_in_us = now_time - startTime;
+        int64_t pts_in_us = now_time - m_startTime;
 
         // 获取输入流的时间基 (例如 {1, 1000000})
         AVRational time_base = m_FormatCtx->streams[packet->stream_index]->time_base;
@@ -213,6 +246,7 @@ void Capture::doReadFrame() {
     } else {
 
     }
+    work_guard();
     if (m_isReading) {
         QMetaObject::invokeMethod(this, "doReadFrame", Qt::QueuedConnection);
     }
@@ -227,152 +261,20 @@ void Capture::closeDevice()
 {
     if (m_FormatCtx) {
         stopReading();
+        {
+            QMutexLocker locker(&m_workMutex);
+            while(m_isDoingWork) {
+                m_workCond.wait(&m_workMutex);
+            }
+        }
         avformat_close_input(&m_FormatCtx);
         m_FormatCtx = nullptr;
         m_videoStreamIndex = -1;
         m_audioStreamIndex = -1;
+        m_isVideo = false;
+        m_isAudio = false;
         WRITE_LOG("Device closed.");
         qDebug("Device closed.");
     }
 }
 
-void Capture::openAudio(const QString &audioDeviceName) {
-    if (m_FormatCtx) {
-        closeDevice();
-    }
-
-    const AVInputFormat *inputFormat = nullptr;
-    AVDictionary *options = nullptr;
-    QString deviceUrl;
-
-#ifdef Q_OS_WIN
-    // Windows 使用 dshow
-    inputFormat = av_find_input_format("dshow");
-    if (!audioDeviceName.isEmpty()) {
-        deviceUrl = QString("audio=%1").arg(audioDeviceName);
-    } else {
-        emit errorOccurred("No audio device name provided for Windows.");
-        return;
-    }
-    // 设置dshow参数以增加缓冲区大小，避免帧丢失
-    av_dict_set(&options, "rtbufsize", "10000000", 0); // 设置为100MB缓冲区
-#elif defined(Q_OS_LINUX)
-    emit errorOccurred("Unsupported operating system.");
-    return;
-#endif
-
-    if (!inputFormat) {
-        emit errorOccurred("No input format provided for audio.");
-        return;
-    }
-
-    m_FormatCtx = avformat_alloc_context();
-    int ret = avformat_open_input(&m_FormatCtx, deviceUrl.toStdString().c_str(), inputFormat, &options);
-    av_dict_free(&options);
-    if (ret < 0) {
-        char errbuf[1024] = {0};
-        av_strerror(ret, errbuf, sizeof(errbuf));
-        emit errorOccurred(QString("Failed to open audio input device: %1").arg(errbuf));
-        avformat_close_input(&m_FormatCtx);
-        m_FormatCtx = nullptr;
-        return;
-    }
-
-    if (avformat_find_stream_info(m_FormatCtx, nullptr) < 0) {
-        emit errorOccurred("Failed to find audio stream information.");
-        closeDevice();
-        return;
-    }
-
-    // 查找最佳音频流
-    m_audioStreamIndex = av_find_best_stream(m_FormatCtx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
-
-    if (m_audioStreamIndex < 0) {
-        emit errorOccurred("Failed to find any audio stream.");
-        closeDevice();
-        return;
-    }
-
-    WRITE_LOG("Audio device opened successfully.");
-    qDebug() << "Audio device opened successfully.";
-    WRITE_LOG("Audio stream index:", m_audioStreamIndex);
-    AVCodecParameters* aParams = m_FormatCtx->streams[m_audioStreamIndex]->codecpar;
-    WRITE_LOG("Audio codec: %1", QString("Codec ID: %1").arg(aParams->codec_id));
-
-    // 视频流索引保持为-1
-    m_videoStreamIndex = -1;
-
-    emit deviceOpenSuccessfully(nullptr, aParams);
-}
-
-void Capture::openVideo(const QString &VideoDeviceName) {
-    if (m_FormatCtx) {
-        closeDevice();
-    }
-
-    const AVInputFormat *inputFormat = nullptr;
-    AVDictionary *options = nullptr;
-    QString deviceUrl;
-
-#ifdef Q_OS_WIN
-    // Windows 使用 dshow
-    inputFormat = av_find_input_format("dshow");
-    if (!VideoDeviceName.isEmpty()) {
-        deviceUrl = QString("video=%1").arg(VideoDeviceName);
-    } else {
-        emit errorOccurred("No video device name provided for Windows.");
-        return;
-    }
-    // 设置dshow参数以增加缓冲区大小，避免帧丢失
-    av_dict_set(&options, "rtbufsize", "10000000", 0); // 设置为100MB缓冲区
-    // 可以设置一些dshow参数，例如视频尺寸、帧率等
-    // av_dict_set(&options, "video_size", "640x480", 0);
-    // av_dict_set(&options, "framerate", "30", 0);
-#elif defined(Q_OS_LINUX)
-    emit errorOccurred("Unsupported operating system.");
-    return;
-#endif
-
-    if (!inputFormat) {
-        emit errorOccurred("No input format provided for video.");
-        return;
-    }
-
-    m_FormatCtx = avformat_alloc_context();
-    int ret = avformat_open_input(&m_FormatCtx, deviceUrl.toStdString().c_str(), inputFormat, &options);
-    av_dict_free(&options);
-    if (ret < 0) {
-        char errbuf[1024] = {0};
-        av_strerror(ret, errbuf, sizeof(errbuf));
-        emit errorOccurred(QString("Failed to open video input device: %1").arg(errbuf));
-        avformat_close_input(&m_FormatCtx);
-        m_FormatCtx = nullptr;
-        return;
-    }
-
-    if (avformat_find_stream_info(m_FormatCtx, nullptr) < 0) {
-        emit errorOccurred("Failed to find video stream information.");
-        closeDevice();
-        return;
-    }
-
-    // 查找最佳视频流
-    m_videoStreamIndex = av_find_best_stream(m_FormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
-
-    if (m_videoStreamIndex < 0) {
-        emit errorOccurred("Failed to find any video stream.");
-        closeDevice();
-        return;
-    }
-
-    WRITE_LOG("Video device opened successfully.");
-    WRITE_LOG("Video stream index:", m_videoStreamIndex);
-    AVCodecParameters* vParams = m_FormatCtx->streams[m_videoStreamIndex]->codecpar;
-    WRITE_LOG("Video codec: %1", QString("Codec ID: %1").arg(vParams->codec_id));
-    WRITE_LOG("Video format: %1x%2", QString("%1x%2").arg(vParams->width).arg(vParams->height));
-
-    // 音频流索引保持为-1，因为我们只打开了视频设备
-    m_audioStreamIndex = -1;
-
-    emit deviceOpenSuccessfully(vParams, nullptr);
-}

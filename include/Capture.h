@@ -28,12 +28,33 @@ class Capture : public QObject{
 public:
     explicit Capture(QObject* parent = nullptr);
     ~Capture();
-
-
     void setPacketQueue(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue);
+
+private:
+    AVFormatContext* m_FormatCtx = nullptr;
+    int m_videoStreamIndex = -1;
+    int m_audioStreamIndex = -1;
+
+    AVCodecParameters* vParams = nullptr;
+    AVCodecParameters* aParams = nullptr;
+
+    std::atomic<bool> m_isReading = false;
+    std::atomic<bool> m_isVideo = false;
+    std::atomic<bool> m_isAudio = false;
+    QString m_videoDeviceName;
+    QString m_audioDeviceName;
+    static void initializeFFmpeg();
+    int64_t m_startTime = 0;
+    // QMutex m_queueMutex;  // 保护队列指针访问的互斥锁
+    QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue = nullptr;
+    QUEUE_DATA<AVPacketPtr>* m_audioPacketQueue = nullptr;
+
+    QMutex m_workMutex;
+    QWaitCondition m_workCond;
+    std::atomic<bool> m_isDoingWork = false;
+
 signals:
     void deviceOpenSuccessfully(AVCodecParameters* vparams,AVCodecParameters* aparams);
-
     void errorOccurred(const QString &errorText);
 
 public slots:
@@ -44,20 +65,9 @@ public slots:
     void stopReading();
     void openAudio(const QString &audioDeviceName);
     void openVideo(const QString &videoDeviceName);
-private:
-    AVFormatContext* m_FormatCtx = nullptr;
-    int m_videoStreamIndex = -1;
-    int m_audioStreamIndex = -1;
+    void closeAudio();
+    void closeVideo();
 
-    AVCodecParameters* vParams = nullptr;
-    AVCodecParameters* aParams = nullptr;
-
-    std::atomic<bool> m_isReading = false;
-    static void initializeFFmpeg();
-    static int64_t startTime;
-    QMutex m_queueMutex;  // 保护队列指针访问的互斥锁
-    QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue = nullptr;
-    QUEUE_DATA<AVPacketPtr>* m_audioPacketQueue = nullptr;
 };
 
 

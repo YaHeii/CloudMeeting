@@ -6,6 +6,8 @@
 #define FFMPEGENCODER_H
 
 #include <QObject>
+#include <QMutex>
+#include <QWaitCondition>
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
 #include "AudioResampleConfig.h"
@@ -25,7 +27,7 @@ public:
 
 private:
     void clear();
-    void encodingLoop();
+    void flushEncoder();  // 清空编码器缓存
 
     QUEUE_DATA<AVFramePtr>* m_frameQueue;
     QUEUE_DATA<AVPacketPtr>* m_packetQueue;
@@ -34,17 +36,23 @@ private:
 
     AVCodecContext* m_codecCtx = nullptr;
     AVMediaType m_mediaType;
+
+    // --- 用于线程同步 ---
+    QMutex m_workMutex;
+    QWaitCondition m_workCond;
+    bool m_isDoingWork = false;
 signals:
     void audioEncoderReady(const AudioResampleConfig& config);
     void errorOccurred(const QString& errorText);
     void encoderInitialized(AVCodecContext* codecCtx);
-    // void initializationSuccess();
+    void initializationSuccess();
 public slots:
     bool initVideoEncoder(AVCodecParameters* vparams);
     bool initAudioEncoder(AVCodecParameters* aparams);
 
     void startEncoding();
     void stopEncoding();
+    void doEncodingWork();
 };
 
 

@@ -8,6 +8,8 @@
 #include <QObject>
 #include <QString>
 #include <QThread>
+#include <QMutex>
+#include <QWaitCondition>
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
 
@@ -21,13 +23,11 @@ class RtmpPublisher : public QObject{
 public:
     explicit RtmpPublisher(QUEUE_DATA<AVPacketPtr>* encodedPacketQueue,QObject *parent = nullptr);
     ~RtmpPublisher();
-    bool init(const QString& rtmpUrl, AVCodecContext* vCodecCtx, AVCodecContext* aCodecCtx);
     void clear();
 private:
     QUEUE_DATA<AVPacketPtr>* m_encodedPacketQueue; // 编码后数据包的输入队列
 
     std::atomic<bool> m_isPublishing = false;
-    void publishingLoop();
 
     AVFormatContext* m_outputFmtCtx = nullptr;
     AVStream* m_videoStream = nullptr;
@@ -36,6 +36,11 @@ private:
     // 保存编码器的时间基，用于正确的PTS/DTS转换
     AVRational m_videoEncoderTimeBase;
     AVRational m_audioEncoderTimeBase;
+    // 线程同步
+    QMutex m_workMutex;
+    QWaitCondition m_workCond;
+    bool m_isDoingWork = false;
+
 signals:
     void errorOccurred(const QString& errorText);
     void publisherStarted();
@@ -43,6 +48,9 @@ signals:
 public slots:
     void startPublishing();
     void stopPublishing();
+    void doPublishingWork();
+    bool init(const QString& rtmpUrl, AVCodecContext* vCodecCtx, AVCodecContext* aCodecCtx);
+
 };
 
 

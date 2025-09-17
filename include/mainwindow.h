@@ -29,7 +29,7 @@ public:
 
 private:
     static QRect pos;
-    bool  _createmeet; //是否创建会议
+    bool _createmeet; //是否创建会议
     bool _joinmeet; // 加入会议
     bool m_isVideoRunning = false;
     bool m_isAudioRunning = false;
@@ -38,12 +38,10 @@ private:
     Ui::MainWindow *ui;
     quint32 mainip; //主屏幕显示的IP图像
 
-    // --- 视频采集 ---
-    QThread *m_videoCaptureThread;
-    Capture *m_videoCapture;
-    // --- 音频采集
-    QThread *m_audioCaptureThread;
-    Capture *m_audioCapture;
+    // --- 采集 ---
+    QThread *m_CaptureThread;
+    Capture *m_Capture;
+
 
     // --- 视频处理链 ---
     ffmpegVideoDecoder* m_videoDecoder; // 之前的 ffmpegDecoder
@@ -59,8 +57,10 @@ private:
     QUEUE_DATA<AVPacketPtr>* m_audioPacketQueue;
     QUEUE_DATA<AVFramePtr>* m_audioFrameQueue;//网络传输帧队列
 
+    // --- rtmp推流 ---
     RtmpPublisher* m_rtmpPublisher;
     QUEUE_DATA<AVPacketPtr>* m_publishPacketQueue;//发送队列
+
     // --- 线程 ---
     QThread* m_videoDecoderThread;
     QThread* m_audioDecoderThread;
@@ -70,22 +70,20 @@ private:
 
     VideoWidget* m_videoWidget;
     QUEUE_DATA<AVPacketPtr>* m_packetQueue;//采集队列
+    bool m_videoEncoderReady = false;
+    bool m_audioEncoderReady = false;
 
 private slots:
-    ////TODO:开启视频和开启音频按钮触发后转变为关闭视频和关闭音频
     void on_openVideo_clicked();
     void on_openAudio_clicked();
     void on_exitmeetBtn_clicked();//暂时使用退出会议来关闭视频音频
     void on_createmeetBtn_clicked();
-
     void onNewFrameAvailable();
-
+    void videoEncoderReady();
+    void audioEncoderReady();
     //// 处理采集到的数据包
     void handleDeviceOpened();
     void handleError(const QString &errorText);
-    //
-    // void onVideoDeviceOpened(AVCodecParameters* params);
-    // void onAudioDeviceOpened(AVCodecParameters* params);
     void onDeviceOpened(AVCodecParameters* vParams, AVCodecParameters* aParams);
 
 };

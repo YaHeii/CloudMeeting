@@ -16,27 +16,6 @@ ffmpegAudioDecoder::~ffmpegAudioDecoder() {
     clear();
 }
 
-void ffmpegAudioDecoder::clear() {
-    stopDecoding();
-    // if (m_audioSink) {
-    //     m_audioSink->stop();
-    //     delete m_audioSink;
-    //     m_audioSink = nullptr;
-    // }
-    if (m_codecCtx) {
-        avcodec_free_context(&m_codecCtx);
-        m_codecCtx = nullptr;
-    }
-    if (m_swrCtx) {
-        swr_free(&m_swrCtx);
-        m_swrCtx = nullptr;
-    }
-    if (m_fifo) {
-        av_audio_fifo_free(m_fifo);
-        m_fifo = nullptr;
-    }
-}
-
 bool ffmpegAudioDecoder::init(AVCodecParameters *params) {
     if (!params) {
         WRITE_LOG("Audio codec not found");
@@ -54,9 +33,35 @@ bool ffmpegAudioDecoder::init(AVCodecParameters *params) {
     return true;
 }
 
+void ffmpegAudioDecoder::clear() {
+    stopDecoding();
+    {
+        QMutexLocker locker(&m_workMutex);
+        while (m_isDoingWork) {
+            m_workCond.wait(&m_workMutex);
+        }
+    }
+
+    if (m_codecCtx) {
+        avcodec_free_context(&m_codecCtx);
+        m_codecCtx = nullptr;
+    }
+    if (m_swrCtx) {
+        swr_free(&m_swrCtx);
+        m_swrCtx = nullptr;
+    }
+    if (m_fifo) {
+        av_audio_fifo_free(m_fifo);
+        m_fifo = nullptr;
+    }
+    WRITE_LOG("Audio decoder cleared successfully.");
+}
+
 void ffmpegAudioDecoder::setResampleConfig(const AudioResampleConfig& config) {
     WRITE_LOG("AudioDecoder received encoder config. Frame size: %d, Sample Rate: %d",
               config.frame_size, config.sample_rate);
+    QMutexLocker locker(&m_workMutex);
+
     m_ResampleConfig = config;
 
     // --- 初始化重采样器 ---
@@ -83,54 +88,65 @@ void ffmpegAudioDecoder::setResampleConfig(const AudioResampleConfig& config) {
         return;
     }
     m_fifoBasePts = AV_NOPTS_VALUE;
-    m_isConfigReady = true; // 标记为配置就绪
+
+    bool wasReady = m_isConfigReady.exchange(true);
+    if (!wasReady && m_isDecoding) {
+        QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
+    }
 }
 
 void ffmpegAudioDecoder::startDecoding() {
+    if (m_isDecoding) return;
     m_isDecoding = true;
-    decodingAudioLoop();
+    QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
+    WRITE_LOG("Audio decoding process started.");
 }
 void ffmpegAudioDecoder::stopDecoding() {
     m_isDecoding = false;
 }
 
-void ffmpegAudioDecoder::decodingAudioLoop() {
-    WRITE_LOG("ffmpegAudioDecoder::startDecoding");
+void ffmpegAudioDecoder::doDecodingPacket() {
+    if (!m_isDecoding) {
+        WRITE_LOG("Audio decoding loop finished.");
+        return;
+    }
+
+    if (!m_isConfigReady) {
+        WRITE_LOG("Audio decoder is waiting for resample configuration...");
+        // 可以设置一个定时器在一段时间后重试，或者完全依赖setResampleConfig的触发
+        // 这里我们选择后者，更高效
+        return;
+    }
+
+    AVPacketPtr packet;
+    if (!m_packetQueue->dequeue(packet)) {
+        WRITE_LOG("ffmpegAudioDecoder::Deque Packet TimeOut");
+        if (m_isDecoding) {
+            QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
+        }
+        return;
+    }
+    // 工作开始
+    {
+        QMutexLocker locker(&m_workMutex);
+        m_isDoingWork = true;
+    }
+    auto work_guard = [this]() {
+        QMutexLocker locker(&m_workMutex);
+        m_isDoingWork = false;
+        m_workCond.wakeAll();
+    };
+
     AVFramePtr decoded_frame(av_frame_alloc());
     AVFramePtr resampledFrame(av_frame_alloc());
-
     if (!decoded_frame || !resampledFrame) {
         emit errorOccurred("ffmpegAudioDecoder::Failed to allocate frame");
         m_isDecoding = false;
         return;
     }
-
-    while (m_isDecoding) {
-
-        if (!m_isConfigReady) { // 如果编码器未就绪，等待
-            QThread::msleep(10);
-            continue;
-        }
-        AVPacketPtr packet;
-        if (!m_packetQueue->dequeue(packet)) {
-            WRITE_LOG("ffmpegAudioDecoder::Deque Packet TimeOut");
-            continue;
-        }
-        
-        if (!packet) {
-            WRITE_LOG("ffmpegAudioDecoder::Received null packet");
-            continue;
-        }
-
-        int sendResult = avcodec_send_packet(m_codecCtx, packet.get());
-        if (sendResult != 0) {
-            char errbuf[1024] = {0};
-            av_strerror(sendResult, errbuf, sizeof(errbuf));
-            WRITE_LOG("ffmpegAudioDecoder::avcodec_send_packet failed: %s", errbuf);
-            continue;
-        }
-
+    if (avcodec_send_packet(m_codecCtx, packet.get()) == 0) {
         while (avcodec_receive_frame(m_codecCtx, decoded_frame.get()) == 0) {
+            if (!m_isDecoding) break;
             // 解码成功，进行重采样
             resampledFrame->ch_layout = m_ResampleConfig.ch_layout;
             resampledFrame->sample_rate = m_ResampleConfig.sample_rate;
@@ -144,8 +160,7 @@ void ffmpegAudioDecoder::decodingAudioLoop() {
                 }
             }
 
-            int ret = swr_convert_frame(m_swrCtx, resampledFrame.get(), decoded_frame.get());
-            if (ret < 0) continue;
+            if (swr_convert_frame(m_swrCtx, resampledFrame.get(), decoded_frame.get()) < 0) continue;
 
             // --- 写入FIFO ---
             av_audio_fifo_write(m_fifo, (void**)resampledFrame->data, resampledFrame->nb_samples);
@@ -175,10 +190,16 @@ void ffmpegAudioDecoder::decodingAudioLoop() {
                 m_frameQueue->enqueue(std::move(sendFrame));
             }
         }
-
     }
-    WRITE_LOG("Audio decoding loop finished.");
+    work_guard(); // 工作结束
+
+    // [修改] 调度下一次执行
+    if (m_isDecoding) {
+        QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
+    }
 }
+
+
 
 
 

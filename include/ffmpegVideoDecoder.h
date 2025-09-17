@@ -10,6 +10,8 @@
 
 #include <QObject>
 #include <QImage>
+#include <QMutex>
+#include <QWaitCondition>
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
 
@@ -38,6 +40,16 @@ private:
     SwsContext* m_swsCtx = nullptr;
     AVFramePtr m_rgbFrame = nullptr;
     // AVFramePtr m_decodedFrame = nullptr;
+
+    // 解决竞态条件问题
+    QMutex m_workMutex;
+    QWaitCondition m_workCond;
+    bool m_isDoingWork = false; // 标志是否正在执行解码核心工作
+
+    // 解决视频参数动态变化问题
+    int m_swsSrcWidth = 0;
+    int m_swsSrcHeight = 0;
+    AVPixelFormat m_swsSrcPixFmt = AV_PIX_FMT_NONE;
 
 signals:
     void newFrameAvailable();

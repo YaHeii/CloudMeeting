@@ -16,12 +16,12 @@ ffmpegEncoder::~ffmpegEncoder()
 {
     clear();
 }
-
+// 编码固定参数，忽略采集参数
 bool ffmpegEncoder::initAudioEncoder(AVCodecParameters* aparams){
     m_mediaType = AVMEDIA_TYPE_AUDIO;
     // const AVCodec* codec = avcodec_find_encoder_by_name("aac"); // 使用AAC编码器
     const AVCodec* codec = avcodec_find_encoder_by_name("libopus");
-    if (!codec) { emit errorOccurred("Codec aac not found."); return false; }
+    if (!codec) { emit errorOccurred("Codec opus not found."); return false; }
 
     m_codecCtx = avcodec_alloc_context3(codec);
     if (!m_codecCtx) { emit errorOccurred("Failed to allocate codec context."); return false; }
@@ -37,7 +37,7 @@ bool ffmpegEncoder::initAudioEncoder(AVCodecParameters* aparams){
     // m_codecCtx->bit_rate = 128000; // 128 kbps
     // m_codecCtx->time_base = {1, m_codecCtx->sample_rate};
 
-    m_codecCtx->sample_rate = 48000;//需要保证aprams->sample_rate一致
+    m_codecCtx->sample_rate = 48000;
     av_channel_layout_default(&m_codecCtx->ch_layout,1);//单声道
     m_codecCtx->sample_fmt = AV_SAMPLE_FMT_FLTP;//浮点平面采样
     m_codecCtx->bit_rate = 48000;
@@ -59,6 +59,7 @@ bool ffmpegEncoder::initAudioEncoder(AVCodecParameters* aparams){
     config.sample_fmt = m_codecCtx->sample_fmt;
     config.ch_layout = m_codecCtx->ch_layout;
     emit audioEncoderReady(config);
+    emit initializationSuccess();
     // emit initializationSuccess();
     WRITE_LOG("Opus encoder initialized successfully. Frame size: %d", m_codecCtx->frame_size);
     return true;
@@ -91,54 +92,104 @@ bool ffmpegEncoder::initVideoEncoder(AVCodecParameters* vparams){
     }
 
     emit encoderInitialized(m_codecCtx);
-    // emit initializationSuccess();
+    emit initializationSuccess();
     WRITE_LOG("Video encoder initialized successfully.");
     return true;
 }
 
 void ffmpegEncoder::startEncoding(){
+    if (m_isEncoding) return;
     m_isEncoding = true;
-    encodingLoop();
+    QMetaObject::invokeMethod(this, "doEncodingWork", Qt::QueuedConnection);
+    WRITE_LOG("Starting encoding process for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
 }
 void ffmpegEncoder::stopEncoding() {
     m_isEncoding = false;
+    WRITE_LOG("Stopping encoding process for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
 }
 
-void ffmpegEncoder::encodingLoop(){
-    WRITE_LOG("Starting encoding loop for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
-
-    while (m_isEncoding) {
-        AVFramePtr frame;
-        if (!m_frameQueue->dequeue(frame)) {
-            continue;
-        }
-
+void ffmpegEncoder::doEncodingWork() {
+    {
+        QMutexLocker locker(&m_workMutex);
+        m_isDoingWork = true;
+    }
+    auto work_guard = [this]() {
+        QMutexLocker locker(&m_workMutex);
+        m_isDoingWork = false;
+        m_workCond.wakeAll();
+    };
+    AVFramePtr frame;
+    if (!m_frameQueue->dequeue(frame)) {
         int ret = avcodec_send_frame(m_codecCtx, frame.get());
         if (ret < 0) {
             emit errorOccurred("Error sending frame to encoder.");
-            continue;
-        }
-        while (ret >= 0) {
-            AVPacketPtr packet(av_packet_alloc());
-            ret = avcodec_receive_packet(m_codecCtx, packet.get());
-            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-                break;
-            } else if (ret < 0) {
-                emit errorOccurred("Error receiving packet from encoder.");
-                break;
+        }else {
+            while (ret >= 0) {
+                AVPacketPtr packet(av_packet_alloc());
+                ret = avcodec_receive_packet(m_codecCtx, packet.get());
+                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+                    break;
+                } else if (ret < 0) {
+                    emit errorOccurred("Error receiving packet from encoder.");
+                    break;
+                }
+                packet->stream_index = (m_mediaType == AVMEDIA_TYPE_VIDEO) ? 0 : 1;
+                m_packetQueue->enqueue(std::move(packet));
             }
-            packet->stream_index = (m_mediaType == AVMEDIA_TYPE_VIDEO)? 0 : 1;
-            // WRITE_LOG("Encoded %s packet with size %d", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"), packet->size);
-            m_packetQueue->enqueue(std::move(packet));
+        }
+    } else {
+        // 如果队列为空（超时），检查是否需要停止
+        if (!m_isEncoding) {
+            // 确认停止，冲洗编码器并最终结束
+            flushEncoder();
+            work_guard(); // 标记工作结束
+            WRITE_LOG("Encoding loop finished for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
+            return; // 结束事件链
+        }
+        WRITE_LOG("Encoding loop finished for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
+    }
+}
+void ffmpegEncoder::flushEncoder() {
+    WRITE_LOG("Flushing encoder for %s...", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
+    if (!m_codecCtx) return;
+
+    // 发送一个 NULL frame 来触发冲洗
+    int ret = avcodec_send_frame(m_codecCtx, nullptr);
+    if (ret < 0) {
+        emit errorOccurred("Error sending flush frame to encoder.");
+        return;
+    }
+    while (ret >= 0) {
+        AVPacketPtr packet(av_packet_alloc());
+        ret = avcodec_receive_packet(m_codecCtx, packet.get());
+        if (ret == AVERROR_EOF) {
+            WRITE_LOG("Encoder flushed successfully.");
+            break;
+        } else if (ret < 0) {
+            emit errorOccurred("Error receiving packet from encoder during flush.");
+            break;
+        }
+        packet->stream_index = (m_mediaType == AVMEDIA_TYPE_VIDEO)? 0 : 1;
+        m_packetQueue->enqueue(std::move(packet));
+    }
+}
+void ffmpegEncoder::clear() {
+    if (m_isEncoding) {
+
+    }else {
+        stopEncoding();
+    }
+
+    {
+        QMutexLocker locker(&m_workMutex);
+        while (m_isDoingWork) {
+            m_workCond.wait(&m_workMutex);
         }
     }
-    WRITE_LOG("Encoding loop finished for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
-}
 
-void ffmpegEncoder::clear() {
-    stopEncoding();
     if (m_codecCtx) {
         avcodec_free_context(&m_codecCtx);
         m_codecCtx = nullptr;
     }
+    WRITE_LOG("ffmpegEncoder cleared.");
 }

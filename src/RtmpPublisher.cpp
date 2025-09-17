@@ -81,76 +81,124 @@ bool RtmpPublisher::init(const QString& rtmpUrl, AVCodecContext* vCodecCtx, AVCo
 }
 
 void RtmpPublisher::startPublishing() {
-    m_isPublishing = true;
-    publishingLoop();
-}
-void RtmpPublisher::publishingLoop() {
-    if (!m_outputFmtCtx) {
-        WRITE_LOG("Publisher NOT initialized");
+    if (m_isPublishing || !m_outputFmtCtx) {
+        WRITE_LOG("Publisher already started or not initialized.");
         return;
     }
     m_isPublishing = true;
     emit publisherStarted();
-    WRITE_LOG("Starting RTMP publishing loop...");
-
-    while (m_isPublishing) {
-        AVPacketPtr packet;
-        if (!m_encodedPacketQueue->dequeue(packet)) {
-            continue;
-        }
-
-        AVStream* dest_stream = nullptr;
-        AVRational source_time_base;
-
-        // 判断包的类型，并设置好目标流和源时间基
-        if (packet->stream_index == 0 && m_videoStream) { // 视频流
-            dest_stream = m_videoStream;
-            source_time_base = m_videoEncoderTimeBase;
-        } else if (packet->stream_index == 1 && m_audioStream) { // 音频流
-            dest_stream = m_audioStream;
-            source_time_base = m_audioEncoderTimeBase;
-        } else {
-            WRITE_LOG("Unknown packet stream_index: %d", packet->stream_index);
-            continue; // 忽略未知来源的包
-        }
-
-        // --- 核心：时间基转换 ---
-        // 将packet的PTS/DTS从编码器的时间基(source_time_base)转换到输出流的时间基(dest_stream->time_base)
-        av_packet_rescale_ts(packet.get(), source_time_base, dest_stream->time_base);
-        packet->pos = -1;
-
-        int ret = av_interleaved_write_frame(m_outputFmtCtx, packet.get());
-        if (ret < 0) {
-            char errbuf[1024] = {0};
-            av_strerror(ret, errbuf, sizeof(errbuf));
-            WRITE_LOG("Error writing frame to RTMP stream: %s", errbuf);
-            // 这里可以根据错误类型决定是否需要重连
-            if (m_isPublishing) { // 避免在停止时重复发信号
-                emit errorOccurred("Failed to write frame, publisher may be disconnected.");
-            }
-            break; // 出现错误，跳出循环
-        }
-    }
-    if (m_outputFmtCtx) {
-        av_write_trailer(m_outputFmtCtx);
-    }
-    WRITE_LOG("RTMP publishing loop finished.");
-    emit publisherStopped();
+    // [修改] 使用事件调用启动推流
+    QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
+    WRITE_LOG("RTMP publishing process started...");
 }
 
 void RtmpPublisher::stopPublishing() {
     m_isPublishing = false;
+    WRITE_LOG("Stopping RTMP publishing process...");
+}
+
+void RtmpPublisher::doPublishingWork() {
+    if (!m_isPublishing) {
+        // 如果在事件到达之前就已经调用了stop，直接处理停止逻辑
+        if (m_outputFmtCtx) {
+            av_write_trailer(m_outputFmtCtx);
+        }
+        WRITE_LOG("RTMP publishing loop finished.");
+        emit publisherStopped();
+        return;
+    }
+    {
+        QMutexLocker locker(&m_workMutex);
+        m_isDoingWork = true;
+    }
+    auto work_guard = [this]() {
+        QMutexLocker locker(&m_workMutex);
+        m_isDoingWork = false;
+        m_workCond.wakeAll();
+    };
+
+
+    AVPacketPtr packet;
+    if (!m_encodedPacketQueue->dequeue(packet)) {
+        if (m_isPublishing) {
+            // 只是暂时为空，继续调度下一次尝试
+            work_guard();
+            QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
+        } else {
+            // 确认停止，写入文件尾并结束
+            if (m_outputFmtCtx) {
+                av_write_trailer(m_outputFmtCtx);
+            }
+            work_guard();
+            WRITE_LOG("RTMP publishing loop finished.");
+            emit publisherStopped();
+        }
+        return;
+    }
+
+    AVStream* dest_stream = nullptr;
+    AVRational source_time_base;
+
+    // 判断包的类型，并设置好目标流和源时间基
+    if (packet->stream_index == 0 && m_videoStream) { // 视频流
+        dest_stream = m_videoStream;
+        source_time_base = m_videoEncoderTimeBase;
+    } else if (packet->stream_index == 1 && m_audioStream) { // 音频流
+        dest_stream = m_audioStream;
+        source_time_base = m_audioEncoderTimeBase;
+    } else {
+        WRITE_LOG("Unknown packet stream_index: %d", packet->stream_index);
+        work_guard();
+        // 调度下一次，不能因为一个未知包就停止整个推流
+        if(m_isPublishing) QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
+        return;
+    }
+
+    // --- 核心：时间基转换 ---
+    // 将packet的PTS/DTS从编码器的时间基(source_time_base)转换到输出流的时间基(dest_stream->time_base)
+    av_packet_rescale_ts(packet.get(), source_time_base, dest_stream->time_base);
+    packet->pos = -1;
+
+    int ret = av_interleaved_write_frame(m_outputFmtCtx, packet.get());
+    if (ret < 0) {
+        char errbuf[1024] = {0};
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        WRITE_LOG("Error writing frame to RTMP stream: %s", errbuf);
+        emit errorOccurred("Failed to write frame, publisher may be disconnected.");
+        if (m_outputFmtCtx) {
+            av_write_trailer(m_outputFmtCtx);
+        }
+        work_guard();
+        emit publisherStopped();
+        return; // 错误发生，终止事件链
+    }
+    work_guard();
+    if (m_isPublishing) {
+        QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
+    } else {
+        // 推完最后一个包后被告知停止
+        if (m_outputFmtCtx) {
+            av_write_trailer(m_outputFmtCtx);
+        }
+        WRITE_LOG("RTMP publishing loop finished.");
+        emit publisherStopped();
+    }
 }
 
 void RtmpPublisher::clear() {
     stopPublishing();
+    //增加同步等待
+    {
+        QMutexLocker locker(&m_workMutex);
+        while (m_isDoingWork) {
+            m_workCond.wait(&m_workMutex);
+        }
+    }
 
     if (m_outputFmtCtx) {
-        // 关闭IO流（如果已打开）
         if (!(m_outputFmtCtx->oformat->flags & AVFMT_NOFILE) && m_outputFmtCtx->pb) {
             avio_closep(&m_outputFmtCtx->pb);
         }
-        // 释放上下文
         avformat_free_context(m_outputFmtCtx);
         m_outputFmtCtx = nullptr;
     }
