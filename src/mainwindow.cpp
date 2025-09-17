@@ -163,6 +163,7 @@ MainWindow::~MainWindow()
     
     delete ui;
 }
+
 //// 打开视频按钮（开关复用）
 void MainWindow::on_openVideo_clicked() {
 
@@ -240,7 +241,7 @@ void MainWindow::on_createmeetBtn_clicked(){
     connect(m_videoEncoder, &ffmpegEncoder::initializationSuccess, this, &MainWindow::videoEncoderReady);
     if (m_isAudioRunning || m_isVideoRunning) {
         ui->createmeetBtn->setEnabled(true);
-        QString rtmpUrl = "rtmp://111/live/stream_key";
+        QString rtmpUrl = "rtmp://127.0.0.1:1935/live/teststream";
         qDebug() << "Joining meeting...";
 
         AVCodecContext *videoCtx = m_videoEncoder->getCodecContext();

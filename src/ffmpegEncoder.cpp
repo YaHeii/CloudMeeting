@@ -85,7 +85,7 @@ bool ffmpegEncoder::initVideoEncoder(AVCodecParameters* vparams){
     m_codecCtx->max_b_frames = 1;
     av_opt_set(m_codecCtx->priv_data, "preset", "ultrafast", 0);
     av_opt_set(m_codecCtx->priv_data, "tune", "zerolatency", 0);
-
+    m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;// 全局头
     if (avcodec_open2(m_codecCtx, codec, nullptr) < 0) {
         emit errorOccurred("Failed to open video codec.");
         return false;
