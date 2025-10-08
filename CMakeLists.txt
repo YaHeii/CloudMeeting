@@ -10,6 +10,7 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 qt_standard_project_setup()
 
 set(FFMPEG_DIR ${CMAKE_SOURCE_DIR}/third_party/ffmpeg)
+set(LIBDATACHANNEL_DIR ${CMAKE_SOURCE_DIR}/third_party/libdatachannel)
 
 set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_CURRENT_SOURCE_DIR}/ui)
 
@@ -51,18 +52,21 @@ qt_add_executable(CloudMeeting
         ui/mainwindow.ui
 )
 target_compile_definitions(CloudMeeting PRIVATE AV_DLL)
+
 target_include_directories(CloudMeeting PRIVATE SYSTEM
         ${FFMPEG_DIR}/include
+        ${LIBDATACHANNEL_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_link_directories(CloudMeeting PRIVATE
         ${FFMPEG_DIR}/lib
+        ${LIBDATACHANNEL_DIR}/lib
 )
 
 target_link_libraries(CloudMeeting PRIVATE
         Qt6::Widgets
         Qt6::Multimedia
-        # CMake 会在链接目录中自动寻找 avcodec.lib/avcodec.a 等
+        # FFmpeg 库
         avcodec
         avformat
         avutil
@@ -70,6 +74,15 @@ target_link_libraries(CloudMeeting PRIVATE
         swscale
         swresample
         winmm
+        # Windows 系统库
+        winmm
+        # --- 新增 libdatachannel 相关库 ---
+        datachannel     # CMake 会自动寻找 datachannel.lib
+        libssl          # OpenSSL
+        libcrypto       # OpenSSL
+        ws2_32          # Windows Sockets 2
+        secur32         # Windows SSPI
+        bcrypt          # Windows Cryptography
 )
 
 include(GNUInstallDirs)
