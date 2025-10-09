@@ -29,7 +29,7 @@ qt_add_executable(CloudMeeting
         src/ffmpegAudioDecoder.cpp
         src/ffmpegEncoder.cpp
         src/RtmpPublisher.cpp
-
+        src/WebRTCPublisher.cpp
 #        ${HEADERS}
         include/ffmpegAudioDecoder.h
         include/mainwindow.h
@@ -47,9 +47,10 @@ qt_add_executable(CloudMeeting
         include/ffmpegEncoder.h
         include/AudioResampleConfig.h
         include/RtmpPublisher.h
-
+        include/WebRTCPublisher.h
         #        ${UIS}
         ui/mainwindow.ui
+
 )
 target_compile_definitions(CloudMeeting PRIVATE AV_DLL)
 
@@ -74,12 +75,17 @@ target_link_libraries(CloudMeeting PRIVATE
         swscale
         swresample
         winmm
-        # Windows 系统库
+
+        # --- libdatachannel 相关库 ---
         winmm
-        # --- 新增 libdatachannel 相关库 ---
-        datachannel     # CMake 会自动寻找 datachannel.lib
-        libssl          # OpenSSL
-        libcrypto       # OpenSSL
+        datachannel
+        libdatachannel.a
+        libssl.a          # OpenSSL
+        libcrypto.a       # OpenSSL
+        libusrsctp.a
+        libjuice.a
+        Crypt32.lib
+        iphlpapi
         ws2_32          # Windows Sockets 2
         secur32         # Windows SSPI
         bcrypt          # Windows Cryptography

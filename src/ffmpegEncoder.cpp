@@ -127,6 +127,7 @@ void ffmpegEncoder::doEncodingWork() {
             while (ret >= 0) {
                 AVPacketPtr packet(av_packet_alloc());
                 ret = avcodec_receive_packet(m_codecCtx, packet.get());
+                WRITE_LOG("Encoding");
                 if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
                     break;
                 } else if (ret < 0) {

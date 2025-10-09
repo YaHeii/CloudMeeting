@@ -12,6 +12,7 @@
 #include "ffmpegAudioDecoder.h"
 #include "ffmpegEncoder.h"
 #include "RtmpPublisher.h"
+#include "WebRTCPublisher.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -41,7 +42,7 @@ private:
     // --- 采集 ---
     QThread *m_CaptureThread;
     Capture *m_Capture;
-
+    QUEUE_DATA<AVPacketPtr>* m_packetQueue;//采集队列
 
     // --- 视频处理链 ---
     ffmpegVideoDecoder* m_videoDecoder; // 之前的 ffmpegDecoder
@@ -57,9 +58,11 @@ private:
     QUEUE_DATA<AVPacketPtr>* m_audioPacketQueue;
     QUEUE_DATA<AVFramePtr>* m_audioFrameQueue;//网络传输帧队列
 
-    // --- rtmp推流 ---
-    RtmpPublisher* m_rtmpPublisher;
+    // --- 推流 ---
+    WebRTCPublisher* m_webRTCPublisher;//WebRTC
+    RtmpPublisher* m_rtmpPublisher;//RTMP
     QUEUE_DATA<AVPacketPtr>* m_publishPacketQueue;//发送队列
+
 
     // --- 线程 ---
     QThread* m_videoDecoderThread;
@@ -67,9 +70,10 @@ private:
     QThread* m_videoEncoderThread;
     QThread* m_audioEncoderThread;
     QThread* m_rtmpPublisherThread;
+    QThread* m_webRTCPublisherThread;
 
     VideoWidget* m_videoWidget;
-    QUEUE_DATA<AVPacketPtr>* m_packetQueue;//采集队列
+
     bool m_videoEncoderReady = false;
     bool m_audioEncoderReady = false;
 
