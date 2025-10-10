@@ -119,7 +119,7 @@ void ffmpegEncoder::doEncodingWork() {
         m_workCond.wakeAll();
     };
     AVFramePtr frame;
-    if (!m_frameQueue->dequeue(frame)) {
+    if (m_frameQueue->dequeue(frame)) {
         int ret = avcodec_send_frame(m_codecCtx, frame.get());
         if (ret < 0) {
             emit errorOccurred("Error sending frame to encoder.");
@@ -138,17 +138,16 @@ void ffmpegEncoder::doEncodingWork() {
                 m_packetQueue->enqueue(std::move(packet));
             }
         }
+    }
+    work_guard();
+    if (m_isEncoding) {
+        QMetaObject::invokeMethod(this, "doEncodingWork", Qt::QueuedConnection);
     } else {
-        // 如果队列为空（超时），检查是否需要停止
-        if (!m_isEncoding) {
-            // 确认停止，冲洗编码器并最终结束
-            flushEncoder();
-            work_guard(); // 标记工作结束
-            WRITE_LOG("Encoding loop finished for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
-            return; // 结束事件链
-        }
+        // 如果在处理过程中收到了停止信号，则冲洗编码器
+        flushEncoder();
         WRITE_LOG("Encoding loop finished for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
     }
+
 }
 void ffmpegEncoder::flushEncoder() {
     WRITE_LOG("Flushing encoder for %s...", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
