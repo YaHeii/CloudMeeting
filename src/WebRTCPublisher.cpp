@@ -1,19 +1,25 @@
 #include "WebRTCPublisher.h"
 #include "logqueue.h"
 #include "log_global.h"
-
+#include <rtc/common.hpp>
+#include "rtc/rtc.hpp"
 #include <QTimer>
-
+#include <chrono>
+#include <memory>
 extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
 // 构造函数实现
 WebRTCPublisher::WebRTCPublisher(QUEUE_DATA<AVPacketPtr>* encodedPacketQueue, QObject *parent) : QObject(parent) {
+    m_networkManager = nullptr;
+}
+void WebRTCPublisher::initThread() {
+
     m_networkManager = new QNetworkAccessManager(this);
+    rtcPreload();
     connect(m_networkManager, &QNetworkAccessManager::finished, this, &WebRTCPublisher::onSignalingReply);
 }
-
 // 析构函数实现
 WebRTCPublisher::~WebRTCPublisher() {
     clear();
@@ -21,11 +27,12 @@ WebRTCPublisher::~WebRTCPublisher() {
 
 bool WebRTCPublisher::init(const QString& signalingUrl, const QString& streamUrl) {
     WRITE_LOG("Initializing WebRTC Publisher");
+    rtcInitLogger(RTC_LOG_VERBOSE,NULL);
     m_signalingUrl = signalingUrl;
     m_streamUrl = streamUrl;
-
+    m_rtcConfig.iceServers.clear();
     m_rtcConfig.iceServers.emplace_back("stun:stun.l.google.com:19302");// 添加STUN服务器
-
+    m_rtcConfig.mtu = 1500;
     initializePeerConnection();
     return true;
 }
@@ -33,32 +40,61 @@ bool WebRTCPublisher::init(const QString& signalingUrl, const QString& streamUrl
 void WebRTCPublisher::initializePeerConnection() {
     try {
         m_peerConnection = std::make_unique<rtc::PeerConnection>(m_rtcConfig);
-
+        //// PC State回调
         m_peerConnection->onStateChange([this](rtc::PeerConnection::State state) {
-            WRITE_LOG("WebRTC PeerConnection state changed: %d", static_cast<int>(state));
-            if (state == rtc::PeerConnection::State::Connected) {
-                // When connected, start the publishing loop
-                if (m_isPublishing) {
-                    emit publisherStarted();
-                    QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
+            auto stateToString = [](rtc::PeerConnection::State s) {
+                switch(s) {
+                    case rtc::PeerConnection::State::New: return "New";
+                    case rtc::PeerConnection::State::Connecting: return "Connecting";
+                    case rtc::PeerConnection::State::Connected: return "Connected";
+                    case rtc::PeerConnection::State::Disconnected: return "Disconnected";
+                    case rtc::PeerConnection::State::Failed: return "Failed";
+                    case rtc::PeerConnection::State::Closed: return "Closed";
+                    default: return "Unknown";
                 }
+            };
+            WRITE_LOG("WebRTC PeerConnection state changed: %s", stateToString(state));
+
+            if (state == rtc::PeerConnection::State::Connected) {
+                emit publisherStarted();
             } else if (state == rtc::PeerConnection::State::Failed) {
                 emit errorOccurred("WebRTC connection failed.");
                 stopPublishing();
             }
         });
-
+        /// ICE State回调
         m_peerConnection->onGatheringStateChange([this](rtc::PeerConnection::GatheringState state) {
-            WRITE_LOG("WebRTC ICE Gathering state changed: %d", static_cast<int>(state));
-            if (state == rtc::PeerConnection::GatheringState::Complete) {
+        auto stateToString = [](rtc::PeerConnection::GatheringState s) {
+            switch(s) {
+                case rtc::PeerConnection::GatheringState::New: return "New"; 
+                case rtc::PeerConnection::GatheringState::InProgress: return "InProgress"; 
+                case rtc::PeerConnection::GatheringState::Complete: return "Complete";
+                default: return "Unknown";
+            }
+        };
+        WRITE_LOG("WebRTC ICE Gathering state changed: %s", stateToString(state));
+        if (state == rtc::PeerConnection::GatheringState::Complete) {
                 auto description = m_peerConnection->localDescription();
                 if (description.has_value()) {
                     WRITE_LOG("ICE Gathering complete. Sending offer to server.");
                     sendOfferToSignalingServer(description.value());
                 } else {
+                    WRITE_LOG("CRITICAL: ICE Gathering is complete, but local description is NOT available.");
                     emit errorOccurred("Failed to get local SDP description after ICE gathering.");
                 }
             }
+        });
+        /// Signaling State回调
+        m_peerConnection->onSignalingStateChange([](rtc::PeerConnection::SignalingState state) {
+            auto stateToString = [](rtc::PeerConnection::SignalingState s) {
+                switch(s) {
+                    case rtc::PeerConnection::SignalingState::Stable: return "Stable";
+                    case rtc::PeerConnection::SignalingState::HaveLocalOffer: return "HaveLocalOffer";
+                    case rtc::PeerConnection::SignalingState::HaveRemoteOffer: return "HaveRemoteOffer";
+                    case rtc::PeerConnection::SignalingState::HaveLocalPranswer: return "HaveLocalPranswer";
+                }
+            };
+            WRITE_LOG("Signaling state changed: %s", stateToString(state));
         });
 
         rtc::Description::Video video("video", rtc::Description::Direction::SendOnly);
@@ -72,6 +108,9 @@ void WebRTCPublisher::initializePeerConnection() {
         audio.addOpusCodec(111, std::nullopt);
         m_audioTrack = m_peerConnection->addTrack(audio);
         WRITE_LOG("Audio track (Opus) added.");
+        
+        // 在添加 tracks 后立即设置本地描述
+        m_peerConnection->setLocalDescription();
     } catch (const std::exception& e) {
         QString error = QString("Failed to create PeerConnection: %1").arg(e.what());
         WRITE_LOG(error.toStdString().c_str());
@@ -84,17 +123,17 @@ void WebRTCPublisher::startPublishing() {
         WRITE_LOG("WebRTC publisher is already running.");
         return;
     }
-    m_isPublishing = true;
     if (!m_peerConnection) {
         emit errorOccurred("WebRTC publisher not initialized.");
-        m_isPublishing = false;
         return;
     }
 
+    m_isPublishing = true;
     WRITE_LOG("Starting WebRTC Publishing");
-    m_peerConnection->setLocalDescription();
+
     QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
 }
+
 void WebRTCPublisher::stopPublishing() {
     if (!m_isPublishing.load()) {
         return;
@@ -106,7 +145,7 @@ void WebRTCPublisher::stopPublishing() {
 //// 考虑使用datachannel库的SDP标准格式
 void WebRTCPublisher::sendOfferToSignalingServer(const std::string& sdp) {
     QJsonObject jsonPayload;
-    // This is the typical payload for SRS HTTP-FLV API
+
     jsonPayload["sdp"] = QString::fromStdString(sdp);
     jsonPayload["streamurl"] = m_streamUrl;
 
@@ -117,32 +156,56 @@ void WebRTCPublisher::sendOfferToSignalingServer(const std::string& sdp) {
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     WRITE_LOG("Sending Offer SDP to %s", m_signalingUrl.toStdString().c_str());
-    m_networkManager->post(request, body);
+     QNetworkReply * reply = m_networkManager->post(request, body);
+        // rtcSendMessage();
+        //
+    if (!reply) {
+        WRITE_LOG("ERROR: Failed to send POST request to signaling server.");
+        emit errorOccurred("Failed to send offer to signaling server.");
+        return;
+    }
+    WRITE_LOG("POST request sent to signaling server.");
 }
-
 void WebRTCPublisher::onSignalingReply(QNetworkReply* reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray response_data = reply->readAll();
+        WRITE_LOG("Received response from signaling server: %s", response_data.constData());
+
         QJsonDocument jsonDoc = QJsonDocument::fromJson(response_data);
         QJsonObject jsonObj = jsonDoc.object();
 
-        if (jsonObj.contains("sdp") && jsonObj.contains("code") && jsonObj["code"].toInt() == 0) {
+        if (jsonObj.contains("code") && jsonObj["code"].toInt() == 0 && jsonObj.contains("sdp")) {
             std::string sdpAnswer = jsonObj["sdp"].toString().toStdString();
             WRITE_LOG("Received Answer SDP from server.");
-            m_peerConnection->setRemoteDescription(rtc::Description(sdpAnswer, "answer"));
+
+            // --- 关键修改：设置远端 SDP 描述 ---
+            try {
+                if (m_peerConnection) {
+                    m_peerConnection->setRemoteDescription(rtc::Description(sdpAnswer, "answer"));
+                    WRITE_LOG("Remote description (answer) set successfully.");
+                } else {
+                    WRITE_LOG("Error: PeerConnection is null when trying to set remote description.");
+                }
+            } catch (const std::exception& e) {
+                QString error = QString("Failed to set remote description: %1").arg(e.what());
+                WRITE_LOG(error.toStdString().c_str());
+                emit errorOccurred(error);
+            }
+
         } else {
-            QString error = QString("Signaling server returned an error: %1").arg(QString(response_data));
+            QString error = QString("Signaling server returned an error or invalid data: %1").arg(QString(response_data));
             WRITE_LOG(error.toStdString().c_str());
             emit errorOccurred(error);
         }
     } else {
-        QString error = QString("Signaling request failed: %1").arg(reply->errorString());
+        QString error = QString("Signaling request failed: %1 (HTTP Status: %2)")
+            .arg(reply->errorString())
+            .arg(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
         WRITE_LOG(error.toStdString().c_str());
         emit errorOccurred(error);
     }
     reply->deleteLater();
 }
-
 void WebRTCPublisher::doPublishingWork() {
     if (!m_isPublishing.load()) {
         WRITE_LOG("WebRTC publishing loop finished.");
@@ -151,31 +214,22 @@ void WebRTCPublisher::doPublishingWork() {
     }
 
     AVPacketPtr packet;
-    // Use a timed dequeue to avoid a busy-wait loop if the queue is empty
-    if (!m_encodedPacketQueue->dequeue(packet)) {
-        // Queue is empty, schedule the next check
-        QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
-        return;
-    }
-
-    try {
-        if (packet->stream_index == 0 && m_videoTrack && m_videoTrack->isOpen()) { // Video stream
-            // libdatachannel handles RTP packetization. Just send the raw NAL units.
-            m_videoTrack->send(reinterpret_cast<const std::byte*>(packet->data), packet->size);
-        } else if (packet->stream_index == 1 && m_audioTrack && m_audioTrack->isOpen()) { // Audio stream
-            m_audioTrack->send(reinterpret_cast<const std::byte*>(packet->data), packet->size);
+    if (m_encodedPacketQueue->dequeue(packet)) { // 使用 try_dequeue 避免阻塞
+        try {
+            if (packet->stream_index == 0 && m_videoTrack && m_videoTrack->isOpen()) {
+                WRITE_LOG("sending video packet, size: %d", packet->size);
+                m_videoTrack->send(reinterpret_cast<const std::byte*>(packet->data), packet->size);
+            } else if (packet->stream_index == 1 && m_audioTrack && m_audioTrack->isOpen()) {
+                WRITE_LOG("sending audio packet, size: %d", packet->size);
+                m_audioTrack->send(reinterpret_cast<const std::byte*>(packet->data), packet->size);
+            }
+        } catch (const std::exception& e) {
+            WRITE_LOG("Exception while sending packet: %s", e.what());
         }
-    } catch (const std::exception& e) {
-        WRITE_LOG("Exception while sending packet: %s", e.what());
     }
 
-    // Schedule the next packet processing
-    if (m_isPublishing.load()) {
-        QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
-    } else {
-        WRITE_LOG("WebRTC publishing loop finished after last packet.");
-        clear();
-    }
+    // 使用 QTimer 来避免堆栈溢出和实现非阻塞循环
+    QTimer::singleShot(1, this, &WebRTCPublisher::doPublishingWork);
 }
 
 void WebRTCPublisher::clear() {

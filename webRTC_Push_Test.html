@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SRS WebRTC Push Test</title>
+</head>
+<body>
+<h1>SRS WebRTC 推流测试</h1>
+<video id="localVideo" width="320" height="240" autoplay muted></video>
+<br>
+<button onclick="startPublish()">开始推流</button>
+<p>流地址: <code id="streamUrl"></code></p>
+
+<script>
+    // 确保 IP 地址和端口与你的 SRS 配置一致
+    const srsServerIp = "10.0.0.10";
+    const streamName = "teststream";
+
+    const videoElement = document.getElementById('localVideo');
+    const streamUrlElement = document.getElementById('streamUrl');
+
+    const streamUrl = `webrtc://${srsServerIp}/live/${streamName}`;
+    streamUrlElement.innerText = streamUrl;
+
+    async function startPublish() {
+        const pc = new RTCPeerConnection();
+
+        // 1. 获取本地摄像头/麦克风媒体流
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: { width: 640, height: 480 }
+        });
+        videoElement.srcObject = stream; // 在本地页面上显示摄像头画面
+
+        // 2. 将本地媒体轨道添加到 PeerConnection
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+        // 3. 创建 SDP Offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // 4. 发送信令到 SRS 服务器
+        console.log("发送 Offer 到 SRS...");
+        try {
+            const session = await fetch(`http://${srsServerIp}:1985/rtc/v1/publish/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sdp: offer.sdp,
+                    streamurl: streamUrl
+                })
+            });
+
+            const data = await session.json();
+            console.log("从 SRS 收到 Answer:", data);
+
+            if (data.code !== 0) {
+                throw new Error(`SRS error: ${data.code}`);
+            }
+
+            // 5. 设置 SRS 返回的远程 SDP Answer
+            await pc.setRemoteDescription(
+                new RTCSessionDescription({ type: 'answer', sdp: data.sdp })
+            );
+
+            alert("推流成功！请在播放器中查看。");
+
+        } catch (error) {
+            console.error("推流失败:", error);
+            alert("推流失败，请检查浏览器控制台 (F12) 的错误信息。");
+        }
+    }
+</script>
+</body>
+</html>

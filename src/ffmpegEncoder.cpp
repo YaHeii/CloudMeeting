@@ -139,6 +139,7 @@ void ffmpegEncoder::doEncodingWork() {
             }
         }
     }
+
     work_guard();
     if (m_isEncoding) {
         QMetaObject::invokeMethod(this, "doEncodingWork", Qt::QueuedConnection);

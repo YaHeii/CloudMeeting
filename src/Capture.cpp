@@ -57,7 +57,7 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
         return;
     }
     // 设置dshow参数以增加缓冲区大小，避免帧丢失
-    av_dict_set(&options, "rtbufsize", "10000000", 0); // 设置为100MB缓冲区
+    av_dict_set(&options, "rtbufsize", "10000000", 0); // 设置缓冲区
     // 可以设置一些dshow参数，例如视频尺寸、帧率等
     // av_dict_set(&options, "video_size", "640x480", 0);
     // av_dict_set(&options, "framerate", "30", 0);

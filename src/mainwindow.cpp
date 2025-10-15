@@ -94,6 +94,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_webRTCPublisher = new WebRTCPublisher(m_publishPacketQueue);
     m_webRTCPublisher->moveToThread(m_webRTCPublisherThread);
     m_webRTCPublisherThread->start();
+    QMetaObject::invokeMethod(m_webRTCPublisher, "initInThread", Qt::QueuedConnection);
 
     //获取可用设备
     QStringList videoDevices = DeviceEnumerator::getDevices(MediaType::Video);
@@ -125,7 +126,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_audioEncoderThread, &QThread::finished, m_audioEncoder, &QObject::deleteLater);
     connect(m_videoEncoderThread, &QThread::finished, m_videoEncoder, &QObject::deleteLater);
     connect(m_webRTCPublisherThread, &QThread::finished, m_webRTCPublisher, &QObject::deleteLater);
-
 }
 
 MainWindow::~MainWindow()
@@ -252,8 +252,8 @@ void MainWindow::on_createmeetBtn_clicked(){
         ui->createmeetBtn->setEnabled(true);
         QString rtmpUrl = "rtmp://127.0.0.1:1935/live/teststream";
         qDebug() << "Joining meeting...";
-        QString webRTCsignalingUrl = "http://127.0.0.1:8080/rtc/v1/publish/";
-        QString webRTCstreamUrl = "webrtc://127.0.0.1/live/teststream"; // WebRTC 的流地址
+        QString webRTCsignalingUrl = "http://10.0.0.10:1985/rtc/v1/publish/";
+        QString webRTCstreamUrl = "webrtc://10.0.0.10/live/teststream"; // WebRTC 的流地址
 
 
         AVCodecContext *videoCtx = m_videoEncoder->getCodecContext();

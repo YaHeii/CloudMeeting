@@ -54,6 +54,7 @@ public slots:
     void startPublishing();
     void stopPublishing();
     void clear();
+    void initThread();
 
 private slots:
     void doPublishingWork();
