@@ -94,7 +94,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_webRTCPublisher = new WebRTCPublisher(m_publishPacketQueue);
     m_webRTCPublisher->moveToThread(m_webRTCPublisherThread);
     m_webRTCPublisherThread->start();
-    QMetaObject::invokeMethod(m_webRTCPublisher, "initInThread", Qt::QueuedConnection);
+    QMetaObject::invokeMethod(m_webRTCPublisher, "initThread", Qt::QueuedConnection);
 
     //获取可用设备
     QStringList videoDevices = DeviceEnumerator::getDevices(MediaType::Video);

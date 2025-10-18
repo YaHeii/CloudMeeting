@@ -1,0 +1,67 @@
+{
+    msvc = {
+        __requirestr = "msvc",
+        __enabled = true,
+        envs = {
+            PATH = {
+                [[C:\Users\lenovo\AppData\Local\.xmake\packages\m\msvc\14.43.17+13\10253c39aca14760ae4382272800b680\bin]],
+                [[C:\Users\lenovo\AppData\Local\.xmake\packages\p\portable_build_tools\v2.10.2\9d3d1bfd46dc470f956d678d722e4a9d\bin]]
+            }
+        }
+    },
+    ["vcpkg::ffmpeg"] = {
+        __requirestr = "vcpkg::ffmpeg",
+        __requireconfs = {
+            version = "7.1.2",
+            configs = {
+                features = {
+                    "avcodec",
+                    "avformat",
+                    "swresample",
+                    "swscale",
+                    "avfilter"
+                }
+            }
+        },
+        __enabled = true,
+        sysincludedirs = [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\include]],
+        links = {
+            "avcodec",
+            "avdevice",
+            "avfilter",
+            "avformat",
+            "avutil",
+            "swresample",
+            "swscale"
+        },
+        libfiles = {
+            [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\avcodec.lib]],
+            [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\avdevice.lib]],
+            [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\avfilter.lib]],
+            [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\avformat.lib]],
+            [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\avutil.lib]],
+            [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\swresample.lib]],
+            [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\swscale.lib]]
+        },
+        linkdirs = [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib]],
+        version = "7.1.2"
+    },
+    ["vcpkg::libdatachannel"] = {
+        __requirestr = "vcpkg::libdatachannel",
+        __requireconfs = {
+            version = "0.23.2",
+            configs = {
+                features = {
+                    "ws",
+                    "srtp"
+                }
+            }
+        },
+        __enabled = true,
+        sysincludedirs = [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_libdatachannel\0.23.2\19e0e82296c24d7ea6ecaa59da91ec99\vcpkg_installed\x64-windows-static-md\include]],
+        links = "datachannel",
+        libfiles = [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_libdatachannel\0.23.2\19e0e82296c24d7ea6ecaa59da91ec99\vcpkg_installed\x64-windows-static-md\lib\datachannel.lib]],
+        linkdirs = [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_libdatachannel\0.23.2\19e0e82296c24d7ea6ecaa59da91ec99\vcpkg_installed\x64-windows-static-md\lib]],
+        version = "0.23.2"
+    }
+}

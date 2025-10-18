@@ -1,8 +1,8 @@
 #include "WebRTCPublisher.h"
 #include "logqueue.h"
 #include "log_global.h"
-#include <rtc/common.hpp>
-#include "rtc/rtc.hpp"
+#include <../third_party/libdatachannel/include/rtc/common.hpp>
+#include "../third_party/libdatachannel/include/rtc/rtc.hpp"
 #include <QTimer>
 #include <chrono>
 #include <memory>
@@ -33,6 +33,7 @@ bool WebRTCPublisher::init(const QString& signalingUrl, const QString& streamUrl
     m_rtcConfig.iceServers.clear();
     m_rtcConfig.iceServers.emplace_back("stun:stun.l.google.com:19302");// 添加STUN服务器
     m_rtcConfig.mtu = 1500;
+    // m_rtcConfig.forceMediaTransport = true;
     initializePeerConnection();
     return true;
 }
@@ -40,6 +41,21 @@ bool WebRTCPublisher::init(const QString& signalingUrl, const QString& streamUrl
 void WebRTCPublisher::initializePeerConnection() {
     try {
         m_peerConnection = std::make_unique<rtc::PeerConnection>(m_rtcConfig);
+
+        /// description回调
+        m_peerConnection->onLocalDescription([this](const rtc::Description& description) {
+            auto descriptionToString = [](rtc::Description::Type type) {
+                switch(type) {
+                    case rtc::Description::Type::Unspec: return "Unspec";
+                    case rtc::Description::Type::Offer: return "Offer";
+                    case rtc::Description::Type::Answer: return "Answer";
+                    case rtc::Description::Type::Pranswer: return "Pranswer";
+                    case rtc::Description::Type::Rollback: return "Rollback";
+                    default: return "Unknown";
+                }
+            };
+            WRITE_LOG("WebRTC PeerConnection description: %s", descriptionToString(description.type()));
+        });
         //// PC State回调
         m_peerConnection->onStateChange([this](rtc::PeerConnection::State state) {
             auto stateToString = [](rtc::PeerConnection::State s) {
@@ -92,6 +108,7 @@ void WebRTCPublisher::initializePeerConnection() {
                     case rtc::PeerConnection::SignalingState::HaveLocalOffer: return "HaveLocalOffer";
                     case rtc::PeerConnection::SignalingState::HaveRemoteOffer: return "HaveRemoteOffer";
                     case rtc::PeerConnection::SignalingState::HaveLocalPranswer: return "HaveLocalPranswer";
+                    default : return "Unknown";
                 }
             };
             WRITE_LOG("Signaling state changed: %s", stateToString(state));

@@ -12,8 +12,8 @@
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
 
-#include <rtc/peerconnection.hpp>
-#include <rtc/track.hpp>
+#include <../third_party/libdatachannel/include/rtc/peerconnection.hpp>
+#include <../third_party/libdatachannel/include/rtc/track.hpp>
 
 extern "C" {
     struct AVCodecContext;

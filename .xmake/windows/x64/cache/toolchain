@@ -1,0 +1,129 @@
+{
+    tool_target_CloudMeeting_windows_x64_cxx = {
+        program = [[D:\VS\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\cl.exe]],
+        toolname = "cl",
+        toolchain_info = {
+            name = "msvc",
+            arch = "x64",
+            cachekey = "msvc_arch_x64_plat_windows",
+            plat = "windows"
+        }
+    },
+    rust_arch_x64_plat_windows = {
+        __global = true,
+        arch = "x64",
+        plat = "windows",
+        __checked = true
+    },
+    swift_arch_x64_plat_windows = {
+        __global = true,
+        arch = "x64",
+        plat = "windows",
+        __checked = true
+    },
+    yasm_arch_x64_plat_windows = {
+        __global = true,
+        arch = "x64",
+        plat = "windows",
+        __checked = true
+    },
+    nim_arch_x64_plat_windows = {
+        __global = true,
+        arch = "x64",
+        plat = "windows",
+        __checked = false
+    },
+    tool_target_CloudMeeting_windows_x64_ld = {
+        program = [[D:\VS\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\link.exe]],
+        toolname = "link",
+        toolchain_info = {
+            name = "msvc",
+            arch = "x64",
+            cachekey = "msvc_arch_x64_plat_windows",
+            plat = "windows"
+        }
+    },
+    clang_arch_x64_plat_windows = {
+        arch = "x64",
+        plat = "windows",
+        __global = true
+    },
+    zig_arch_x64_plat_windows = {
+        arch = "x64",
+        plat = "windows",
+        __global = true
+    },
+    nasm_arch_x64_plat_windows = {
+        __global = true,
+        arch = "x64",
+        plat = "windows",
+        __checked = true
+    },
+    msvc_arch_x64_plat_windows = {
+        vcarchs = {
+            "arm",
+            "arm64",
+            "arm64ec",
+            "x64",
+            "x86"
+        },
+        arch = "x64",
+        vs_toolset = "14.44.35207",
+        vs = "2022",
+        plat = "windows",
+        vs_sdkver = "10.0.26100.0",
+        vcvars = {
+            VCIDEInstallDir = [[D:\VS\Common7\IDE\VC\]],
+            VCInstallDir = [[D:\VS\VC\]],
+            LIBPATH = [[D:\VS\VC\Tools\MSVC\14.44.35207\ATLMFC\lib\x64;D:\VS\VC\Tools\MSVC\14.44.35207\lib\x64;D:\VS\VC\Tools\MSVC\14.44.35207\lib\x86\store\references;D:\Windows Kits\10\UnionMetadata\10.0.26100.0;D:\Windows Kits\10\References\10.0.26100.0;C:\Windows\Microsoft.NET\Framework64\v4.0.30319]],
+            VCToolsRedistDir = [[D:\VS\VC\Redist\MSVC\14.44.35112\]],
+            VSCMD_VER = "17.14.10",
+            VisualStudioVersion = "17.0",
+            DevEnvdir = [[D:\VS\Common7\IDE\]],
+            UniversalCRTSdkDir = [[D:\Windows Kits\10\]],
+            VSCMD_ARG_app_plat = "Desktop",
+            WindowsSdkVerBinPath = [[D:\Windows Kits\10\bin\10.0.26100.0\]],
+            WindowsSdkDir = [[D:\Windows Kits\10\]],
+            UCRTVersion = "10.0.26100.0",
+            ExtensionSdkDir = [[C:\Program Files (x86)\Microsoft SDKs\Windows Kits\10\ExtensionSDKs]],
+            PATH = [[D:\VS\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64;D:\VS\Common7\IDE\VC\VCPackages;D:\VS\Common7\IDE\CommonExtensions\Microsoft\TestWindow;D:\VS\Common7\IDE\CommonExtensions\Microsoft\TeamFoundation\Team Explorer;D:\VS\MSBuild\Current\bin\Roslyn;D:\VS\Team Tools\DiagnosticsHub\Collector;D:\Windows Kits\10\bin\10.0.26100.0\\x64;D:\Windows Kits\10\bin\\x64;D:\VS\\MSBuild\Current\Bin\amd64;C:\Windows\Microsoft.NET\Framework64\v4.0.30319;D:\VS\Common7\IDE\;D:\VS\Common7\Tools\;D:\CUDA_toolkit\bin;D:\CUDA_toolkit\libnvvp;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\Program Files\Common Files\Autodesk Shared\;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files\Calibre2\;D:\latex\texlive\2021\bin\win32;D:\for_linux\;C:\Program Files\MATLAB\MATLAB Runtime\v95\runtime\win64;D:\vivo\pcsuite\;C:\Program Files\CMake\bin;D:\Anaconda;D:\Anaconda\Scripts;D:\wkhtmltopdf\bin;C:\Program Files\NVIDIA Corporation\NVIDIA App\NvDLISR;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\NVIDIA Corporation\Nsight Compute 2025.1.1\;C:\Users\lenovo\AppData\Roaming\Python\Python311\Scripts;D:\Git\cmd;D:\MATLAB2025a\runtime\win64;D:\MATLAB2025a\bin;D:\docker\docker\resources\bin;D:\ffmpeg-master-latest-win64-gpl-shared\bin;D:\Nodejs;D:\Windows Kits\10\Windows Performance Toolkit\;C:\ProgramData\chocolatey\bin;C:\Program Files\Java\jdk1.8.0_211\bin;C:\Program Files\nodejs\;D:\vcpkg;;D:\Xmake;C:\Users\lenovo\AppData\Local\Programs\Python\Python311\Scripts\;C:\Users\lenovo\AppData\Local\Programs\Python\Python311\;D:\Microsoft_Visual_C_6.0_downcc.com\Tools\WinNT;D:\Microsoft_Visual_C_6.0_downcc.com\MSDev98\Bin;D:\Microsoft_Visual_C_6.0_downcc.com\Tools;D:\VC98\bin;C:\Users\lenovo\AppData\Local\Microsoft\WindowsApps;D:\Microsoft VS Code\bin;D:\latex\texlive\2021\bin\win32;D:\PyCharm Community Edition 2022.1.3\bin;D:\Cline\CLion 2025.1.2\bin;D:\opencv-4.10.0\build\install\x64\mingw\bin;D:\wkhtmltopdf\bin;D:\QT\Tools\mingw1310_64\bin;C:\Users\lenovo\.lmstudio\bin;D:\cursor\resources\app\bin;D:\IDEA\IntelliJ IDEA Community Edition 2025.2\bin;C:\Users\lenovo\AppData\Roaming\npm;D:\vcpkg;;D:\VS\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;D:\VS\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;D:\VS\Common7\IDE\VC\Linux\bin\ConnectionManagerExe;D:\VS\VC\vcpkg]],
+            VSCMD_ARG_TGT_ARCH = "x64",
+            VS170COMNTOOLS = [[D:\VS\Common7\Tools\]],
+            LIB = [[D:\VS\VC\Tools\MSVC\14.44.35207\ATLMFC\lib\x64;D:\VS\VC\Tools\MSVC\14.44.35207\lib\x64;D:\Windows Kits\10\lib\10.0.26100.0\ucrt\x64;D:\Windows Kits\10\\lib\10.0.26100.0\\um\x64;D:\VC98\mfc\lib;D:\VC98\lib]],
+            VSInstallDir = [[D:\VS\]],
+            WindowsSDKVersion = "10.0.26100.0",
+            WindowsSdkBinPath = [[D:\Windows Kits\10\bin\]],
+            VCToolsInstallDir = [[D:\VS\VC\Tools\MSVC\14.44.35207\]],
+            INCLUDE = [[D:\VS\VC\Tools\MSVC\14.44.35207\include;D:\VS\VC\Tools\MSVC\14.44.35207\ATLMFC\include;D:\VS\VC\Auxiliary\VS\include;D:\Windows Kits\10\include\10.0.26100.0\ucrt;D:\Windows Kits\10\\include\10.0.26100.0\\um;D:\Windows Kits\10\\include\10.0.26100.0\\shared;D:\Windows Kits\10\\include\10.0.26100.0\\winrt;D:\Windows Kits\10\\include\10.0.26100.0\\cppwinrt;D:\VC98\atl\include;D:\VC98\mfc\include;D:\VC98\include]],
+            VCToolsVersion = "14.44.35207",
+            VSCMD_ARG_HOST_ARCH = "x64",
+            WindowsLibPath = [[D:\Windows Kits\10\UnionMetadata\10.0.26100.0;D:\Windows Kits\10\References\10.0.26100.0]]
+        },
+        __global = true,
+        __checked = "2022"
+    },
+    go_arch_x64_plat_windows = {
+        __global = true,
+        arch = "x64",
+        plat = "windows",
+        __checked = true
+    },
+    fpc_arch_x64_plat_windows = {
+        __global = true,
+        arch = "x64",
+        plat = "windows",
+        __checked = true
+    },
+    cuda_arch_x64_plat_windows = {
+        __global = true,
+        arch = "x64",
+        plat = "windows",
+        __checked = true
+    },
+    gfortran_arch_x64_plat_windows = {
+        __global = true,
+        arch = "x64",
+        plat = "windows",
+        __checked = true
+    }
+}

@@ -1,0 +1,95 @@
+{
+    ["lib.detect.has_flags"] = {
+        ["windows_x64_d:\\vs\\vc\\tools\\msvc\\14.44.35207\\bin\\hostx64\\x64\\cl.exe__cxx_cxflags_-nologo_cl_sourceDependencies"] = true,
+        ["windows_x64_d:\\vs\\vc\\tools\\msvc\\14.44.35207\\bin\\hostx64\\x64\\cl.exe__cxx_cxxflags_-nologo_/permissive-"] = true,
+        ["windows_x64_d:\\vs\\vc\\tools\\msvc\\14.44.35207\\bin\\hostx64\\x64\\cl.exe__cxx_cxxflags_-nologo_/Zc:__cplusplus"] = true,
+        ["windows_x64_d:\\vs\\vc\\tools\\msvc\\14.44.35207\\bin\\hostx64\\x64\\cl.exe__cxx__-nologo_-O2"] = true,
+        ["windows_x64_d:\\vs\\vc\\tools\\msvc\\14.44.35207\\bin\\hostx64\\x64\\cl.exe__cxx_cxflags_-nologo_cl_external_includedir"] = true,
+        ["windows_x64_d:\\vs\\vc\\tools\\msvc\\14.44.35207\\bin\\hostx64\\x64\\cl.exe__cxx_cxflags_-nologo_-DNDEBUG"] = true
+    },
+    ["detect.sdks.find_vcpkgdir"] = [[D:\vcpkg]],
+    find_program_msvc_arch_x64_plat_windows_checktoolld = {
+        ["link.exe"] = [[D:\VS\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\link.exe]]
+    },
+    find_program_msvc_arch_x64_plat_windows_checktoolcxx = {
+        ["cl.exe"] = [[D:\VS\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\cl.exe]]
+    },
+    find_program_fetch_package_xmake = {
+        portable_build_tools = false,
+        msvc = false
+    },
+    find_program_fetch_package_system = {
+        portable_build_tools = false
+    },
+    find_program = {
+        ["D:\\VS\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\cl.exe"] = [[d:\vs\vc\tools\msvc\14.44.35207\bin\hostx64\x64\cl.exe]],
+        ["vcpkg.exe"] = [[D:\vcpkg\vcpkg.exe]],
+        ["cl.exe"] = [[D:\VS\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\cl.exe]],
+        nim = false,
+        pkgconf = false,
+        tar = [[C:\Windows\System32\tar.exe]],
+        git = [[D:\Git\cmd\git.exe]],
+        ["pkg-config"] = false,
+        gzip = [[D:\latex\texlive\2021\bin\win32\gzip.exe]]
+    },
+    ["detect.sdks.find_qt"] = {
+        ["D:/QT/6.9.3/msvc2022_64"] = ref("detect.sdks.find_qt"),
+        qt = {
+            libexecdir = "D:/QT/6.9.3/msvc2022_64/bin",
+            qmldir = "D:/QT/6.9.3/msvc2022_64/qml",
+            includedir = "D:/QT/6.9.3/msvc2022_64/include",
+            libexecdir_host = "D:/QT/6.9.3/msvc2022_64/bin",
+            bindir = "D:/QT/6.9.3/msvc2022_64/bin",
+            sdkver = "6.9.3",
+            libdir = "D:/QT/6.9.3/msvc2022_64/lib",
+            pluginsdir = "D:/QT/6.9.3/msvc2022_64/plugins",
+            bindir_host = "D:/QT/6.9.3/msvc2022_64/bin",
+            sdkdir = "D:/QT/6.9.3/msvc2022_64",
+            mkspecsdir = [[D:\QT\6.9.3\msvc2022_64\mkspecs]]
+        }
+    },
+    find_package_windows_x64_fetch_package_system = {
+        ["vcpkg::ffmpeg_718bb5fdd06e447a9f9bd35762a631f6_release_7.1.2_external"] = {
+            version = "7.1.2",
+            linkdirs = {
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib]]
+            },
+            sysincludedirs = {
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\include]]
+            },
+            links = {
+                "avcodec",
+                "avdevice",
+                "avfilter",
+                "avformat",
+                "avutil",
+                "swresample",
+                "swscale"
+            },
+            libfiles = {
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\avcodec.lib]],
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\avdevice.lib]],
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\avfilter.lib]],
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\avformat.lib]],
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\avutil.lib]],
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\swresample.lib]],
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_ffmpeg\7.1.2\718bb5fdd06e447a9f9bd35762a631f6\vcpkg_installed\x64-windows-static-md\lib\swscale.lib]]
+            }
+        },
+        ["vcpkg::libdatachannel_19e0e82296c24d7ea6ecaa59da91ec99_release_0.23.2_external"] = {
+            version = "0.23.2",
+            linkdirs = {
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_libdatachannel\0.23.2\19e0e82296c24d7ea6ecaa59da91ec99\vcpkg_installed\x64-windows-static-md\lib]]
+            },
+            sysincludedirs = {
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_libdatachannel\0.23.2\19e0e82296c24d7ea6ecaa59da91ec99\vcpkg_installed\x64-windows-static-md\include]]
+            },
+            links = {
+                "datachannel"
+            },
+            libfiles = {
+                [[D:\code\C++\QT\CloudMeeting\build\.packages\v\vcpkg_libdatachannel\0.23.2\19e0e82296c24d7ea6ecaa59da91ec99\vcpkg_installed\x64-windows-static-md\lib\datachannel.lib]]
+            }
+        }
+    }
+}

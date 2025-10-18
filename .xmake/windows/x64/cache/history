@@ -1,0 +1,61 @@
+{
+    cmdlines = {
+        [[xmake f --toolchain=msvc --qt=D:\QT]],
+        [[xmake f --toolchain=msvc --qt=D:\QT]],
+        "xmake clean",
+        "xmake clean",
+        "xmake clean",
+        "xmake clean",
+        "xmake clean",
+        "xmake clean",
+        "xmake g --qt=D:/QT",
+        "xmake clean",
+        "xmake clean",
+        "xmake clean",
+        [[xmake f --qt=D:\QT]],
+        [[xmake f --qt=D:\QT]],
+        [[xmake f --qt=D:\QT]],
+        [[xmake f --qt=D:\QT]],
+        "xmake clean",
+        "xmake clean",
+        "xmake clean",
+        "xmake clean",
+        "xmake f",
+        "xmake f",
+        "xmake ",
+        [[xmake lua D:\Xmake\modules\private\utils\statistics.lua]],
+        "xmake clean",
+        "xmake f",
+        "xmake ",
+        [[xmake lua D:\Xmake\actions\build\cleaner.lua]],
+        "xmake ",
+        "xmake f",
+        "xmake f -y -m debug -p windows -a x86 --toolchain=msvc",
+        "xmake run",
+        "xmake run",
+        "xmake l -c \"import('core.project.config'); \
+import('core.project.project'); \
+config.load(); \
+for name, _ in pairs((project.targets())) \
+    do print(name) \
+end\"",
+        "xmake l -c \"import('core.project.config'); \
+import('core.project.project'); \
+config.load(); \
+for name, _ in pairs((project.targets())) \
+    do print(name) \
+end\"",
+        "xmake l -c \"import('core.project.config'); \
+import('core.project.project'); \
+config.load(); \
+for name, _ in pairs((project.targets())) \
+    do print(name) \
+end\"",
+        "xmake f -y -m debug -p windows -a x86 --toolchain=msvc",
+        "xmake project -vD -k cmake",
+        "xmake project -v -k cmake",
+        "xmake project -v -k cmake",
+        "xmake ",
+        [[xmake lua D:\Xmake\actions\build\cleaner.lua]]
+    }
+}
