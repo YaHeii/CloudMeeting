@@ -1,4 +1,4 @@
-#ifndef MAINWINDOW_H
+﻿#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 /**
  *madebyYahei
@@ -15,17 +15,19 @@
 #include "WebRTCPublisher.h"
 
 QT_BEGIN_NAMESPACE
+
 namespace Ui {
-class MainWindow;
+    class MainWindow;
 }
+
 QT_END_NAMESPACE
 
-class MainWindow : public QMainWindow
-{
+class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
     MainWindow(QWidget *parent = nullptr);
+
     ~MainWindow();
 
 private:
@@ -42,53 +44,60 @@ private:
     // --- 采集 ---
     QThread *m_CaptureThread;
     Capture *m_Capture;
-    QUEUE_DATA<AVPacketPtr>* m_packetQueue;//采集队列
+    QUEUE_DATA<AVPacketPtr> *m_packetQueue; //采集队列
 
     // --- 视频处理链 ---
-    ffmpegVideoDecoder* m_videoDecoder; // 之前的 ffmpegDecoder
-    ffmpegEncoder* m_videoEncoder;
-    QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue;//采集队列
-    QUEUE_DATA<std::unique_ptr<QImage>>* m_QimageQueue;//QT显示队列
-    QUEUE_DATA<AVFramePtr>* m_videoFrameQueue;//网络传输帧队列
+    ffmpegVideoDecoder *m_videoDecoder; // 之前的 ffmpegDecoder
+    ffmpegEncoder *m_videoEncoder;
+    QUEUE_DATA<AVPacketPtr> *m_videoPacketQueue; //采集队列
+    QUEUE_DATA<std::unique_ptr<QImage> > *m_QimageQueue; //QT显示队列
+    QUEUE_DATA<AVFramePtr> *m_videoFrameQueue; //网络传输帧队列
 
 
     // --- 音频处理链 ---
-    ffmpegAudioDecoder* m_audioDecoder;
-    ffmpegEncoder* m_audioEncoder;
-    QUEUE_DATA<AVPacketPtr>* m_audioPacketQueue;
-    QUEUE_DATA<AVFramePtr>* m_audioFrameQueue;//网络传输帧队列
+    ffmpegAudioDecoder *m_audioDecoder;
+    ffmpegEncoder *m_audioEncoder;
+    QUEUE_DATA<AVPacketPtr> *m_audioPacketQueue;
+    QUEUE_DATA<AVFramePtr> *m_audioFrameQueue; //网络传输帧队列
 
     // --- 推流 ---
-    WebRTCPublisher* m_webRTCPublisher;//WebRTC
-    RtmpPublisher* m_rtmpPublisher;//RTMP
-    QUEUE_DATA<AVPacketPtr>* m_publishPacketQueue;//发送队列
+    WebRTCPublisher *m_webRTCPublisher; //WebRTC
+    RtmpPublisher *m_rtmpPublisher; //RTMP
+    QUEUE_DATA<AVPacketPtr> *m_publishPacketQueue; //发送队列
 
 
     // --- 线程 ---
-    QThread* m_videoDecoderThread;
-    QThread* m_audioDecoderThread;
-    QThread* m_videoEncoderThread;
-    QThread* m_audioEncoderThread;
-    QThread* m_rtmpPublisherThread;
-    QThread* m_webRTCPublisherThread;
+    QThread *m_videoDecoderThread;
+    QThread *m_audioDecoderThread;
+    QThread *m_videoEncoderThread;
+    QThread *m_audioEncoderThread;
+    QThread *m_rtmpPublisherThread;
+    QThread *m_webRTCPublisherThread;
 
-    VideoWidget* m_videoWidget;
+    VideoWidget *m_videoWidget;
 
     bool m_videoEncoderReady = false;
     bool m_audioEncoderReady = false;
 
 private slots:
     void on_openVideo_clicked();
+
     void on_openAudio_clicked();
-    void on_exitmeetBtn_clicked();//暂时使用退出会议来关闭视频音频
+
+    void on_exitmeetBtn_clicked(); //暂时使用退出会议来关闭视频音频
     void on_createmeetBtn_clicked();
+
     void onNewFrameAvailable();
+
     void videoEncoderReady();
+
     void audioEncoderReady();
+
     //// 处理采集到的数据包
     void handleDeviceOpened();
-    void handleError(const QString &errorText);
-    void onDeviceOpened(AVCodecParameters* vParams, AVCodecParameters* aParams);
 
+    void handleError(const QString &errorText);
+
+    void onDeviceOpened(AVCodecParameters *vParams, AVCodecParameters *aParams);
 };
 #endif // MAINWINDOW_H

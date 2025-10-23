@@ -1,17 +1,14 @@
-#include "mytextedit.h"
+﻿#include "mytextedit.h"
 #include <QVBoxLayout>
 #include <QStringListModel>
 #include <QDebug>
 #include <QAbstractItemView>
 #include <QScrollBar>
 
-Completer::Completer(QWidget *parent): QCompleter(parent)
-{
-
+Completer::Completer(QWidget *parent): QCompleter(parent) {
 }
 
-MyTextEdit::MyTextEdit(QWidget *parent): QWidget(parent)
-{
+MyTextEdit::MyTextEdit(QWidget *parent): QWidget(parent) {
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     edit = new QPlainTextEdit();
@@ -22,19 +19,16 @@ MyTextEdit::MyTextEdit(QWidget *parent): QWidget(parent)
     edit->installEventFilter(this);
 }
 
-QString MyTextEdit::textUnderCursor()
-{
+QString MyTextEdit::textUnderCursor() {
     QTextCursor tc = edit->textCursor();
     tc.select(QTextCursor::WordUnderCursor);
     return tc.selectedText();
 }
 
-void MyTextEdit::complete()
-{
-    if(edit->toPlainText().size() == 0 || completer == nullptr) return;
-    QChar tail =  edit->toPlainText().at(edit->toPlainText().size()-1);
-    if(tail == '@')
-    {
+void MyTextEdit::complete() {
+    if (edit->toPlainText().size() == 0 || completer == nullptr) return;
+    QChar tail = edit->toPlainText().at(edit->toPlainText().size() - 1);
+    if (tail == '@') {
         completer->setCompletionPrefix(tail);
         QAbstractItemView *view = completer->popup();
         view->setCurrentIndex(completer->completionModel()->index(0, 0));
@@ -45,8 +39,7 @@ void MyTextEdit::complete()
     }
 }
 
-void MyTextEdit::changeCompletion(QString text)
-{
+void MyTextEdit::changeCompletion(QString text) {
     QTextCursor tc = edit->textCursor();
     int len = text.size() - completer->completionPrefix().size();
     tc.movePosition(QTextCursor::EndOfWord);
@@ -56,7 +49,7 @@ void MyTextEdit::changeCompletion(QString text)
 
     QString str = edit->toPlainText();
     int pos = str.size() - 1;
-    while(str.at(pos) != '@') pos--;
+    while (str.at(pos) != '@') pos--;
 
     tc.clearSelection();
     tc.setPosition(pos, QTextCursor::MoveAnchor);
@@ -74,72 +67,55 @@ void MyTextEdit::changeCompletion(QString text)
     tc.insertText(" ");
     edit->setTextCursor(tc);
 
-    ipspan.push_back(QPair<int, int>(pos, str.size()+1));
-
+    ipspan.push_back(QPair<int, int>(pos, str.size() + 1));
 }
 
-QString MyTextEdit::toPlainText()
-{
+QString MyTextEdit::toPlainText() {
     return edit->toPlainText();
 }
 
-void MyTextEdit::setPlainText(QString str)
-{
+void MyTextEdit::setPlainText(QString str) {
     edit->setPlainText(str);
 }
 
-void MyTextEdit::setPlaceholderText(QString str)
-{
+void MyTextEdit::setPlaceholderText(QString str) {
     edit->setPlaceholderText(str);
 }
 
-void MyTextEdit::setCompleter(QStringList stringlist)
-{
-    if(completer == nullptr)
-    {
+void MyTextEdit::setCompleter(QStringList stringlist) {
+    if (completer == nullptr) {
         completer = new Completer(this);
         completer->setWidget(this);
         completer->setCompletionMode(QCompleter::PopupCompletion);
         completer->setCaseSensitivity(Qt::CaseInsensitive);
         connect(completer, SIGNAL(activated(QString)), this, SLOT(changeCompletion(QString)));
-    }
-    else
-    {
+    } else {
         delete completer->model();
     }
-    QStringListModel * model = new QStringListModel(stringlist, this);
+    QStringListModel *model = new QStringListModel(stringlist, this);
     completer->setModel(model);
 }
 
-bool MyTextEdit::eventFilter(QObject *obj, QEvent *event)
-{
-    if(obj == edit)
-    {
-        if(event->type() == QEvent::KeyPress)
-        {
+bool MyTextEdit::eventFilter(QObject *obj, QEvent *event) {
+    if (obj == edit) {
+        if (event->type() == QEvent::KeyPress) {
             QKeyEvent *keyevent = static_cast<QKeyEvent *>(event);
             QTextCursor tc = edit->textCursor();
             int p = tc.position();
             int i;
-            for(i = 0; i < ipspan.size(); i++)
-            {
-                if( (keyevent->key() == Qt::Key_Backspace && p > ipspan[i].first && p <= ipspan[i].second ) || (keyevent->key() == Qt::Key_Delete && p >= ipspan[i].first && p < ipspan[i].second) )
-                {
+            for (i = 0; i < ipspan.size(); i++) {
+                if ((keyevent->key() == Qt::Key_Backspace && p > ipspan[i].first && p <= ipspan[i].second) || (
+                        keyevent->key() == Qt::Key_Delete && p >= ipspan[i].first && p < ipspan[i].second)) {
                     tc.setPosition(ipspan[i].first, QTextCursor::MoveAnchor);
-                    if(p == ipspan[i].second)
-                    {
+                    if (p == ipspan[i].second) {
                         tc.setPosition(ipspan[i].second, QTextCursor::KeepAnchor);
-                    }
-                    else
-                    {
+                    } else {
                         tc.setPosition(ipspan[i].second + 1, QTextCursor::KeepAnchor);
                     }
                     tc.removeSelectedText();
                     ipspan.removeAt(i);
                     return true;
-                }
-                else if(p >= ipspan[i].first && p <= ipspan[i].second)
-                {
+                } else if (p >= ipspan[i].first && p <= ipspan[i].second) {
                     QTextCursor tc = edit->textCursor();
                     tc.setPosition(ipspan[i].second);
                     edit->setTextCursor(tc);

@@ -1,4 +1,4 @@
-/**
+﻿/**
  *完成音视频的帧数据编码
  *madebyYahei
  */
@@ -9,22 +9,29 @@
 #include "log_global.h"
 #include "libavutil/opt.h"
 
-ffmpegEncoder::ffmpegEncoder(QUEUE_DATA<AVFramePtr>* frameQueue,QUEUE_DATA<AVPacketPtr>* packetQueue,QObject* parent)
-    : m_frameQueue(frameQueue),m_packetQueue(packetQueue){}
+ffmpegEncoder::ffmpegEncoder(QUEUE_DATA<AVFramePtr> *frameQueue, QUEUE_DATA<AVPacketPtr> *packetQueue, QObject *parent)
+    : m_frameQueue(frameQueue), m_packetQueue(packetQueue) {
+}
 
-ffmpegEncoder::~ffmpegEncoder()
-{
+ffmpegEncoder::~ffmpegEncoder() {
     clear();
 }
+
 // 编码固定参数，忽略采集参数
-bool ffmpegEncoder::initAudioEncoder(AVCodecParameters* aparams){
+bool ffmpegEncoder::initAudioEncoder(AVCodecParameters *aparams) {
     m_mediaType = AVMEDIA_TYPE_AUDIO;
     // const AVCodec* codec = avcodec_find_encoder_by_name("aac"); // 使用AAC编码器
-    const AVCodec* codec = avcodec_find_encoder_by_name("libopus");
-    if (!codec) { emit errorOccurred("Codec opus not found."); return false; }
+    const AVCodec *codec = avcodec_find_encoder_by_name("libopus");
+    if (!codec) {
+        emit errorOccurred("Codec opus not found.");
+        return false;
+    }
 
     m_codecCtx = avcodec_alloc_context3(codec);
-    if (!m_codecCtx) { emit errorOccurred("Failed to allocate codec context."); return false; }
+    if (!m_codecCtx) {
+        emit errorOccurred("Failed to allocate codec context.");
+        return false;
+    }
 
     // // 设置音频编码参数
     // m_codecCtx->sample_rate = aparams->sample_rate;
@@ -38,10 +45,11 @@ bool ffmpegEncoder::initAudioEncoder(AVCodecParameters* aparams){
     // m_codecCtx->time_base = {1, m_codecCtx->sample_rate};
 
     m_codecCtx->sample_rate = 48000;
-    av_channel_layout_default(&m_codecCtx->ch_layout,1);//单声道
-    m_codecCtx->sample_fmt = AV_SAMPLE_FMT_FLTP;//浮点平面采样
+    av_channel_layout_default(&m_codecCtx->ch_layout, 1); //单声道
+    m_codecCtx->sample_fmt = AV_SAMPLE_FMT_FLTP; //浮点平面采样
     m_codecCtx->bit_rate = 48000;
-    if (av_opt_set(m_codecCtx->priv_data, "application", "voip", 0) < 0) {//优化语音延迟
+    if (av_opt_set(m_codecCtx->priv_data, "application", "voip", 0) < 0) {
+        //优化语音延迟
         emit errorOccurred("Failed to set Opus application to voip.");
     }
     // 设置 VBR (Variable Bit-Rate) 开启，可以在保证质量的同时节省带宽
@@ -65,13 +73,19 @@ bool ffmpegEncoder::initAudioEncoder(AVCodecParameters* aparams){
     return true;
 }
 
-bool ffmpegEncoder::initVideoEncoder(AVCodecParameters* vparams){
+bool ffmpegEncoder::initVideoEncoder(AVCodecParameters *vparams) {
     m_mediaType = AVMEDIA_TYPE_VIDEO;
-    const AVCodec* codec = avcodec_find_encoder_by_name("libx264"); // 使用H.264 编码器
-    if (!codec) { emit errorOccurred("Codec libx264 not found."); return false; }
+    const AVCodec *codec = avcodec_find_encoder_by_name("libx264"); // 使用H.264 编码器
+    if (!codec) {
+        emit errorOccurred("Codec libx264 not found.");
+        return false;
+    }
 
     m_codecCtx = avcodec_alloc_context3(codec);
-    if (!m_codecCtx) { emit errorOccurred("Failed to allocate codec context."); return false; }
+    if (!m_codecCtx) {
+        emit errorOccurred("Failed to allocate codec context.");
+        return false;
+    }
 
     // 设置视频编码参数
     m_codecCtx->width = vparams->width;
@@ -85,7 +99,7 @@ bool ffmpegEncoder::initVideoEncoder(AVCodecParameters* vparams){
     m_codecCtx->max_b_frames = 1;
     av_opt_set(m_codecCtx->priv_data, "preset", "ultrafast", 0);
     av_opt_set(m_codecCtx->priv_data, "tune", "zerolatency", 0);
-    m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;// 全局头
+    m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // 全局头
     if (avcodec_open2(m_codecCtx, codec, nullptr) < 0) {
         emit errorOccurred("Failed to open video codec.");
         return false;
@@ -97,19 +111,19 @@ bool ffmpegEncoder::initVideoEncoder(AVCodecParameters* vparams){
     return true;
 }
 
-void ffmpegEncoder::startEncoding(){
+void ffmpegEncoder::startEncoding() {
     if (m_isEncoding) return;
     m_isEncoding = true;
     QMetaObject::invokeMethod(this, "doEncodingWork", Qt::QueuedConnection);
     WRITE_LOG("Starting encoding process for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
 }
+
 void ffmpegEncoder::stopEncoding() {
     m_isEncoding = false;
     WRITE_LOG("Stopping encoding process for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
 }
 
-void ffmpegEncoder::doEncodingWork() {
-    {
+void ffmpegEncoder::doEncodingWork() { {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = true;
     }
@@ -123,7 +137,7 @@ void ffmpegEncoder::doEncodingWork() {
         int ret = avcodec_send_frame(m_codecCtx, frame.get());
         if (ret < 0) {
             emit errorOccurred("Error sending frame to encoder.");
-        }else {
+        } else {
             while (ret >= 0) {
                 AVPacketPtr packet(av_packet_alloc());
                 ret = avcodec_receive_packet(m_codecCtx, packet.get());
@@ -148,8 +162,8 @@ void ffmpegEncoder::doEncodingWork() {
         flushEncoder();
         WRITE_LOG("Encoding loop finished for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
     }
-
 }
+
 void ffmpegEncoder::flushEncoder() {
     WRITE_LOG("Flushing encoder for %s...", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
     if (!m_codecCtx) return;
@@ -170,18 +184,16 @@ void ffmpegEncoder::flushEncoder() {
             emit errorOccurred("Error receiving packet from encoder during flush.");
             break;
         }
-        packet->stream_index = (m_mediaType == AVMEDIA_TYPE_VIDEO)? 0 : 1;
+        packet->stream_index = (m_mediaType == AVMEDIA_TYPE_VIDEO) ? 0 : 1;
         m_packetQueue->enqueue(std::move(packet));
     }
 }
+
 void ffmpegEncoder::clear() {
     if (m_isEncoding) {
-
-    }else {
+    } else {
         stopEncoding();
-    }
-
-    {
+    } {
         QMutexLocker locker(&m_workMutex);
         while (m_isDoingWork) {
             m_workCond.wait(&m_workMutex);

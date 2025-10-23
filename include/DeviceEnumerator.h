@@ -1,4 +1,4 @@
-#ifndef DEVICEENUMERATOR_H
+﻿#ifndef DEVICEENUMERATOR_H
 #define DEVICEENUMERATOR_H
 /**
  *madebyYahei
@@ -7,8 +7,7 @@
 #include <QStringList>
 #include "Capture.h"
 
-class DeviceEnumerator
-{
+class DeviceEnumerator {
 public:
     static QStringList getDevices(MediaType mediaType);
 };

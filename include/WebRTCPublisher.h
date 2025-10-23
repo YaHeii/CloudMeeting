@@ -1,4 +1,4 @@
-#ifndef WEBRTCMANAGER_H
+﻿#ifndef WEBRTCMANAGER_H
 #define WEBRTCMANAGER_H
 
 #include <QObject>
@@ -12,11 +12,11 @@
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
 
-#include <../third_party/libdatachannel/include/rtc/peerconnection.hpp>
-#include <../third_party/libdatachannel/include/rtc/track.hpp>
+#include <rtc/peerconnection.hpp>
+#include <rtc/track.hpp>
 
 extern "C" {
-    struct AVCodecContext;
+struct AVCodecContext;
 }
 
 
@@ -24,14 +24,16 @@ class WebRTCPublisher : public QObject {
     Q_OBJECT
 
 public:
-    explicit WebRTCPublisher(QUEUE_DATA<AVPacketPtr>* encodedPacketQueue, QObject *parent = nullptr);
+    explicit WebRTCPublisher(QUEUE_DATA<AVPacketPtr> *encodedPacketQueue, QObject *parent = nullptr);
+
     ~WebRTCPublisher();
 
 private:
     void initializePeerConnection();
-    void sendOfferToSignalingServer(const std::string& sdp);
 
-    QUEUE_DATA<AVPacketPtr>* m_encodedPacketQueue;
+    void sendOfferToSignalingServer(const std::string &sdp);
+
+    QUEUE_DATA<AVPacketPtr> *m_encodedPacketQueue;
     std::atomic<bool> m_isPublishing = false;
 
     // --- WebRTC members ---
@@ -41,26 +43,32 @@ private:
     rtc::Configuration m_rtcConfig;
 
     // --- Signaling members ---
-    QNetworkAccessManager* m_networkManager;
+    QNetworkAccessManager *m_networkManager;
     QString m_signalingUrl;
     QString m_streamUrl;
 signals:
-    void errorOccurred(const QString& errorText);
+    void errorOccurred(const QString &errorText);
+
     void publisherStarted();
+
     void publisherStopped();
 
 public slots:
-    bool init(const QString& signalingUrl, const QString& streamUrl);
+    bool init(const QString &signalingUrl, const QString &streamUrl);
+
     void startPublishing();
+
     void stopPublishing();
+
     void clear();
+
     void initThread();
 
 private slots:
     void doPublishingWork();
-    void onSignalingReply(QNetworkReply* reply);
-};
 
+    void onSignalingReply(QNetworkReply *reply);
+};
 
 
 #endif //WEBRTCMANAGER_H

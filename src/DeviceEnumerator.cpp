@@ -1,4 +1,4 @@
-#include "DeviceEnumerator.h"
+﻿#include "DeviceEnumerator.h"
 #include <QDebug>
 
 extern "C" {
@@ -6,11 +6,10 @@ extern "C" {
 #include <libavutil/error.h> // for av_strerror
 }
 
-QStringList DeviceEnumerator::getDevices(MediaType mediaType)
-{
+QStringList DeviceEnumerator::getDevices(MediaType mediaType) {
     QStringList deviceList;
     const AVInputFormat *inputFormat = nullptr;
-    const char* formatName = nullptr;
+    const char *formatName = nullptr;
 
 #ifdef Q_OS_WIN
     formatName = "dshow";

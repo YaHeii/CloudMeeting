@@ -1,8 +1,7 @@
-/**
+﻿/**
  *音频编码器重采样通道配置
  *madebyYahei
  */
-
 
 
 #ifndef AUDIORESAMPLECONFIG_H

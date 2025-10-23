@@ -1,4 +1,4 @@
-#include "screen.h"
+﻿#include "screen.h"
 #include <QGuiApplication>
 #include <QApplication>
 #include <QScreen>
@@ -8,8 +8,7 @@ int Screen::width = -1;
 int Screen::height = -1;
 
 
-void Screen::init()
-{
+void Screen::init() {
     QScreen *s = QGuiApplication::primaryScreen();
 
 

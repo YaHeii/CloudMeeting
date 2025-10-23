@@ -1,4 +1,4 @@
-/**
+﻿/**
  *madebyYahei
  *设计音频解码，以及重采样逻辑
  */
@@ -23,22 +23,25 @@ extern "C" {
 
 class ffmpegAudioDecoder : public QObject {
     Q_OBJECT
+
 public:
-    explicit ffmpegAudioDecoder(QUEUE_DATA<AVPacketPtr>* packetQueue,QUEUE_DATA<AVFramePtr>* frameQueue, QObject *parent = nullptr);
+    explicit ffmpegAudioDecoder(QUEUE_DATA<AVPacketPtr> *packetQueue, QUEUE_DATA<AVFramePtr> *frameQueue,
+                                QObject *parent = nullptr);
+
     ~ffmpegAudioDecoder();
 
 private:
     void clear();
 
-    QUEUE_DATA<AVPacketPtr>* m_packetQueue;
-    QUEUE_DATA<AVFramePtr>* m_frameQueue;
+    QUEUE_DATA<AVPacketPtr> *m_packetQueue;
+    QUEUE_DATA<AVFramePtr> *m_frameQueue;
     std::atomic<bool> m_isDecoding = false;
     std::atomic<bool> m_isConfigReady = false;
 
     // FFmpeg-related members
-    AVCodecContext* m_codecCtx = nullptr;
-    const AVCodec* m_codec = nullptr;
-    SwrContext* m_swrCtx = nullptr; // 用于音频重采样
+    AVCodecContext *m_codecCtx = nullptr;
+    const AVCodec *m_codec = nullptr;
+    SwrContext *m_swrCtx = nullptr; // 用于音频重采样
     AVAudioFifo *m_fifo = nullptr;
     AVCodecContext *m_encoderCtx = nullptr;
     int64_t m_fifoBasePts = AV_NOPTS_VALUE;
@@ -53,15 +56,19 @@ private:
     // QAudioSink* m_audioSink = nullptr;
     // QIODevice* m_audioDevice = nullptr; // 音频输出设备
 public slots:
-    bool init(AVCodecParameters* params);
-    void startDecoding();
-    void stopDecoding();
-    void setResampleConfig(const AudioResampleConfig& config);
-    void doDecodingPacket();
-signals:
-    void errorOccurred(const QString& errorText);
-};
+    bool init(AVCodecParameters *params);
 
+    void startDecoding();
+
+    void stopDecoding();
+
+    void setResampleConfig(const AudioResampleConfig &config);
+
+    void doDecodingPacket();
+
+signals:
+    void errorOccurred(const QString &errorText);
+};
 
 
 #endif //FFMPEGAUDIODECODER_H

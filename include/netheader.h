@@ -1,4 +1,4 @@
-#ifndef NETHEADER_H
+﻿#ifndef NETHEADER_H
 #define NETHEADER_H
 #include <QMetatype>
 #include <QMutexLocker>
@@ -42,8 +42,7 @@
 #endif
 
 
-enum MSG_TYPE
-{
+enum MSG_TYPE {
     IMG_SEND = 0,
     IMG_RECV,
     AUDIO_SEND,
@@ -63,9 +62,9 @@ enum MSG_TYPE
     RemoteHostClosedError = 40,
     OtherNetError = 41
 };
-Q_DECLARE_METATYPE(MSG_TYPE);//添加进入Qvariant
-struct MESG
-{
+
+Q_DECLARE_METATYPE(MSG_TYPE); //添加进入Qvariant
+struct MESG {
     MSG_TYPE msg_type;
     uchar *data;
     long len;

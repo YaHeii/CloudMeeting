@@ -1,22 +1,22 @@
-#include "RtmpPublisher.h"
+﻿#include "RtmpPublisher.h"
 
 #include "logqueue.h"
 #include "log_global.h"
 
-extern "C"{
+extern "C" {
 #include "libavformat/avformat.h"
 #include "libavutil/time.h"
 }
 
-RtmpPublisher::RtmpPublisher(QUEUE_DATA<AVPacketPtr>* encodedPacketQueue, QObject *parent)
-    : QObject{parent}, m_encodedPacketQueue(encodedPacketQueue){}
+RtmpPublisher::RtmpPublisher(QUEUE_DATA<AVPacketPtr> *encodedPacketQueue, QObject *parent)
+    : QObject{parent}, m_encodedPacketQueue(encodedPacketQueue) {
+}
 
-RtmpPublisher::~RtmpPublisher()
-{
+RtmpPublisher::~RtmpPublisher() {
     clear();
 }
 
-bool RtmpPublisher::init(const QString& rtmpUrl, AVCodecContext* vCodecCtx, AVCodecContext* aCodecCtx) {
+bool RtmpPublisher::init(const QString &rtmpUrl, AVCodecContext *vCodecCtx, AVCodecContext *aCodecCtx) {
     if (m_outputFmtCtx) {
         clear();
     }
@@ -25,7 +25,7 @@ bool RtmpPublisher::init(const QString& rtmpUrl, AVCodecContext* vCodecCtx, AVCo
         return false;
     }
 
-    int ret = avformat_alloc_output_context2(&m_outputFmtCtx,nullptr,"flv",rtmpUrl.toStdString().c_str());
+    int ret = avformat_alloc_output_context2(&m_outputFmtCtx, nullptr, "flv", rtmpUrl.toStdString().c_str());
     if (ret < 0 || !m_outputFmtCtx) {
         WRITE_LOG("Failed to allocate output context.");
         return false;
@@ -40,7 +40,7 @@ bool RtmpPublisher::init(const QString& rtmpUrl, AVCodecContext* vCodecCtx, AVCo
         }
         avcodec_parameters_from_context(m_videoStream->codecpar, vCodecCtx);
         m_videoStream->codecpar->codec_tag = 0;
-        m_videoEncoderTimeBase = vCodecCtx->time_base;//设置编码器时间基
+        m_videoEncoderTimeBase = vCodecCtx->time_base; //设置编码器时间基
     }
     if (aCodecCtx) {
         m_audioStream = avformat_new_stream(m_outputFmtCtx, nullptr);
@@ -106,8 +106,7 @@ void RtmpPublisher::doPublishingWork() {
         WRITE_LOG("RTMP publishing loop finished.");
         emit publisherStopped();
         return;
-    }
-    {
+    } {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = true;
     }
@@ -136,21 +135,23 @@ void RtmpPublisher::doPublishingWork() {
         return;
     }
 
-    AVStream* dest_stream = nullptr;
+    AVStream *dest_stream = nullptr;
     AVRational source_time_base;
 
     // 判断包的类型，并设置好目标流和源时间基
-    if (packet->stream_index == 0 && m_videoStream) { // 视频流
+    if (packet->stream_index == 0 && m_videoStream) {
+        // 视频流
         dest_stream = m_videoStream;
         source_time_base = m_videoEncoderTimeBase;
-    } else if (packet->stream_index == 1 && m_audioStream) { // 音频流
+    } else if (packet->stream_index == 1 && m_audioStream) {
+        // 音频流
         dest_stream = m_audioStream;
         source_time_base = m_audioEncoderTimeBase;
     } else {
         WRITE_LOG("Unknown packet stream_index: %d", packet->stream_index);
         work_guard();
         // 调度下一次，不能因为一个未知包就停止整个推流
-        if(m_isPublishing) QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
+        if (m_isPublishing) QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
         return;
     }
 

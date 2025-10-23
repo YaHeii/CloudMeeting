@@ -1,4 +1,4 @@
-#ifndef THREADSAFEQUEUE_H
+﻿#ifndef THREADSAFEQUEUE_H
 #define THREADSAFEQUEUE_H
 #include <QMutex>
 #include <QQueue>
@@ -10,19 +10,19 @@ const int QUEUE_MAXSIZE = 1500;
 const int WAIT_MILLISECONDS = 2000;
 
 template<typename T>
-class QUEUE_DATA
-{
+class QUEUE_DATA {
 public:
     QUEUE_DATA() = default;
 
-    QUEUE_DATA(const QUEUE_DATA&) = delete;
-    QUEUE_DATA& operator=(const QUEUE_DATA&) = delete;
+    QUEUE_DATA(const QUEUE_DATA &) = delete;
+
+    QUEUE_DATA &operator=(const QUEUE_DATA &) = delete;
 
     /**
      * @brief 向队列尾部添加一个元素（生产者）
      * @param item 元素的智能指针，所有权将被转移到队列中
      */
-    void enqueue(T item)//入队无引用
+    void enqueue(T item) //入队无引用
     {
         QMutexLocker locker(&m_mutex);
 
@@ -39,7 +39,7 @@ public:
      * @param result 用于接收元素的智能指针引用
      * @return 如果成功取出元素则返回 true，超时则返回 false
      */
-    bool dequeue(T& result)//出队有引用
+    bool dequeue(T &result) //出队有引用
     {
         QMutexLocker locker(&m_mutex);
 
@@ -59,8 +59,7 @@ public:
     }
 
 
-    void clear()
-    {
+    void clear() {
         QMutexLocker locker(&m_mutex);
         std::queue<T> empty_queue;
         m_queue.swap(empty_queue);
@@ -72,7 +71,7 @@ public:
 private:
     mutable QMutex m_mutex;
     QWaitCondition m_notEmptyCond; // 条件：队列不为空
-    QWaitCondition m_notFullCond;  // 条件：队列不满
+    QWaitCondition m_notFullCond; // 条件：队列不满
     std::queue<T> m_queue;
 };
 

@@ -1,10 +1,11 @@
-#include "Capture.h"
+﻿#include "Capture.h"
 
 #include "logqueue.h"
 #include "log_global.h"
 #include "libavutil/time.h"
 
 bool ffmpegInputInitialized = false;
+
 void Capture::initializeFFmpeg() {
     if (!ffmpegInputInitialized) {
         avdevice_register_all();
@@ -13,7 +14,7 @@ void Capture::initializeFFmpeg() {
     }
 }
 
-Capture::Capture(QObject* parent) : QObject(parent) {
+Capture::Capture(QObject *parent) : QObject(parent) {
     initializeFFmpeg();
 }
 
@@ -25,8 +26,7 @@ Capture::~Capture() {
     WRITE_LOG("VideoCapture destroyed.");
 }
 
-void Capture::setPacketQueue(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue)
-{
+void Capture::setPacketQueue(QUEUE_DATA<AVPacketPtr> *videoQueue, QUEUE_DATA<AVPacketPtr> *audioQueue) {
     // 线程安全地设置队列指针
     QMutexLocker locker(&m_workMutex);
     m_videoPacketQueue = videoQueue;
@@ -84,7 +84,7 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
     }
 
     m_FormatCtx = avformat_alloc_context();
-    int ret = avformat_open_input(&m_FormatCtx,deviceUrl.toStdString().c_str(),inputFormat,&options);
+    int ret = avformat_open_input(&m_FormatCtx, deviceUrl.toStdString().c_str(), inputFormat, &options);
     av_dict_free(&options);
     if (ret < 0) {
         char errbuf[1024] = {0};
@@ -117,16 +117,16 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
     if (m_videoStreamIndex >= 0) {
         WRITE_LOG("Video stream index:", m_videoStreamIndex);
         m_isVideo = true;
-        AVCodecParameters* vParams = m_FormatCtx->streams[m_videoStreamIndex]->codecpar;
+        AVCodecParameters *vParams = m_FormatCtx->streams[m_videoStreamIndex]->codecpar;
         WRITE_LOG("Video codec: %1", QString("Codec ID: %1").arg(vParams->codec_id));
         WRITE_LOG("Video format: %1x%2", QString("%1x%2").arg(vParams->width).arg(vParams->height));
     } else {
         WRITE_LOG("No video stream found.");
     }
-    
+
     if (m_audioStreamIndex >= 0) {
         WRITE_LOG("Audio stream index:", m_audioStreamIndex);
-        AVCodecParameters* aParams = m_FormatCtx->streams[m_audioStreamIndex]->codecpar;
+        AVCodecParameters *aParams = m_FormatCtx->streams[m_audioStreamIndex]->codecpar;
         m_isAudio = true;
         WRITE_LOG("Audio codec: %1", QString("Codec ID: %1").arg(aParams->codec_id));
         // WRITE_LOG(QString("Audio channels: %1").arg(aParams->channels));
@@ -141,7 +141,7 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
 void Capture::openAudio(const QString &audioDeviceName) {
     if (m_isVideo) {
         openDevice(m_videoDeviceName, audioDeviceName);
-    }else {
+    } else {
         openDevice(nullptr, audioDeviceName);
     }
 }
@@ -149,7 +149,7 @@ void Capture::openAudio(const QString &audioDeviceName) {
 void Capture::openVideo(const QString &VideoDeviceName) {
     if (m_isAudio) {
         openDevice(VideoDeviceName, m_audioDeviceName);
-    }else {
+    } else {
         openDevice(VideoDeviceName, nullptr);
     }
 }
@@ -158,17 +158,20 @@ void Capture::closeAudio() {
     closeDevice();
     openVideo(m_videoDeviceName);
 }
+
 void Capture::closeVideo() {
     closeDevice();
     openAudio(m_audioDeviceName);
 }
+
 void Capture::startReading() {
     if (!m_FormatCtx) {
         WRITE_LOG("Failed to start reading - format context is null.");
         return;
     }
 
-    if(m_isReading) { // 防止重复启动
+    if (m_isReading) {
+        // 防止重复启动
         return;
     }
     WRITE_LOG("Starting to read frames...");
@@ -181,8 +184,7 @@ void Capture::doReadFrame() {
     if (!m_isReading.load()) {
         WRITE_LOG("Reading loop gracefully stopped.");
         return;
-    }
-    {
+    } {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = true;
     }
@@ -192,11 +194,11 @@ void Capture::doReadFrame() {
         m_workCond.wakeAll();
     };
     // 线程安全地获取队列指针
-    QUEUE_DATA<AVPacketPtr>* videoQueue = nullptr;
-    QUEUE_DATA<AVPacketPtr>* audioQueue = nullptr;
+    QUEUE_DATA<AVPacketPtr> *videoQueue = nullptr;
+    QUEUE_DATA<AVPacketPtr> *audioQueue = nullptr;
 
-        videoQueue = m_videoPacketQueue;
-        audioQueue = m_audioPacketQueue;
+    videoQueue = m_videoPacketQueue;
+    audioQueue = m_audioPacketQueue;
 
     if (!videoQueue || !audioQueue) {
         WRITE_LOG("Packet queue NOT SET.");
@@ -244,7 +246,6 @@ void Capture::doReadFrame() {
     } else if (packet->stream_index == m_audioStreamIndex) {
         audioQueue->enqueue(std::move(packet));
     } else {
-
     }
     work_guard();
     if (m_isReading) {
@@ -257,13 +258,11 @@ void Capture::stopReading() {
     m_isReading = false;
 }
 
-void Capture::closeDevice()
-{
+void Capture::closeDevice() {
     if (m_FormatCtx) {
-        stopReading();
-        {
+        stopReading(); {
             QMutexLocker locker(&m_workMutex);
-            while(m_isDoingWork) {
+            while (m_isDoingWork) {
                 m_workCond.wait(&m_workMutex);
             }
         }
@@ -277,4 +276,3 @@ void Capture::closeDevice()
         qDebug("Device closed.");
     }
 }
-

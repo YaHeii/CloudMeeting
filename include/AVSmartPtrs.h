@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by lenovo on 25-9-10.
 //
 
@@ -6,11 +6,13 @@
 #define AVSMARTPTRS_H
 
 #include <memory>
-extern "C"{
+
+extern "C" {
 #include <libavcodec/avcodec.h>
 }
+
 struct AVPacketDeleter {
-    void operator()(AVPacket* p) const {
+    void operator()(AVPacket *p) const {
         if (p) {
             av_packet_free(&p);
         }
@@ -18,7 +20,7 @@ struct AVPacketDeleter {
 };
 
 struct AVFrameDeleter {
-    void operator()(AVFrame* p) const {
+    void operator()(AVFrame *p) const {
         if (p) {
             av_frame_free(&p);
         }

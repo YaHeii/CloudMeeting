@@ -1,37 +1,39 @@
-#include "WebRTCPublisher.h"
+﻿#include "WebRTCPublisher.h"
 #include "logqueue.h"
 #include "log_global.h"
-#include <../third_party/libdatachannel/include/rtc/common.hpp>
-#include "../third_party/libdatachannel/include/rtc/rtc.hpp"
+#include <rtc/common.hpp>
+#include <rtc/rtc.hpp>
 #include <QTimer>
 #include <chrono>
 #include <memory>
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
 // 构造函数实现
-WebRTCPublisher::WebRTCPublisher(QUEUE_DATA<AVPacketPtr>* encodedPacketQueue, QObject *parent) : QObject(parent) {
+WebRTCPublisher::WebRTCPublisher(QUEUE_DATA<AVPacketPtr> *encodedPacketQueue, QObject *parent) : QObject(parent) {
     m_networkManager = nullptr;
 }
-void WebRTCPublisher::initThread() {
 
+void WebRTCPublisher::initThread() {
     m_networkManager = new QNetworkAccessManager(this);
     rtcPreload();
     connect(m_networkManager, &QNetworkAccessManager::finished, this, &WebRTCPublisher::onSignalingReply);
 }
+
 // 析构函数实现
 WebRTCPublisher::~WebRTCPublisher() {
     clear();
 }
 
-bool WebRTCPublisher::init(const QString& signalingUrl, const QString& streamUrl) {
+bool WebRTCPublisher::init(const QString &signalingUrl, const QString &streamUrl) {
     WRITE_LOG("Initializing WebRTC Publisher");
     rtcInitLogger(RTC_LOG_VERBOSE,NULL);
     m_signalingUrl = signalingUrl;
     m_streamUrl = streamUrl;
     m_rtcConfig.iceServers.clear();
-    m_rtcConfig.iceServers.emplace_back("stun:stun.l.google.com:19302");// 添加STUN服务器
+    m_rtcConfig.iceServers.emplace_back("stun:stun.l.google.com:19302"); // 添加STUN服务器
     m_rtcConfig.mtu = 1500;
     // m_rtcConfig.forceMediaTransport = true;
     initializePeerConnection();
@@ -43,9 +45,9 @@ void WebRTCPublisher::initializePeerConnection() {
         m_peerConnection = std::make_unique<rtc::PeerConnection>(m_rtcConfig);
 
         /// description回调
-        m_peerConnection->onLocalDescription([this](const rtc::Description& description) {
+        m_peerConnection->onLocalDescription([this](const rtc::Description &description) {
             auto descriptionToString = [](rtc::Description::Type type) {
-                switch(type) {
+                switch (type) {
                     case rtc::Description::Type::Unspec: return "Unspec";
                     case rtc::Description::Type::Offer: return "Offer";
                     case rtc::Description::Type::Answer: return "Answer";
@@ -59,7 +61,7 @@ void WebRTCPublisher::initializePeerConnection() {
         //// PC State回调
         m_peerConnection->onStateChange([this](rtc::PeerConnection::State state) {
             auto stateToString = [](rtc::PeerConnection::State s) {
-                switch(s) {
+                switch (s) {
                     case rtc::PeerConnection::State::New: return "New";
                     case rtc::PeerConnection::State::Connecting: return "Connecting";
                     case rtc::PeerConnection::State::Connected: return "Connected";
@@ -80,16 +82,16 @@ void WebRTCPublisher::initializePeerConnection() {
         });
         /// ICE State回调
         m_peerConnection->onGatheringStateChange([this](rtc::PeerConnection::GatheringState state) {
-        auto stateToString = [](rtc::PeerConnection::GatheringState s) {
-            switch(s) {
-                case rtc::PeerConnection::GatheringState::New: return "New"; 
-                case rtc::PeerConnection::GatheringState::InProgress: return "InProgress"; 
-                case rtc::PeerConnection::GatheringState::Complete: return "Complete";
-                default: return "Unknown";
-            }
-        };
-        WRITE_LOG("WebRTC ICE Gathering state changed: %s", stateToString(state));
-        if (state == rtc::PeerConnection::GatheringState::Complete) {
+            auto stateToString = [](rtc::PeerConnection::GatheringState s) {
+                switch (s) {
+                    case rtc::PeerConnection::GatheringState::New: return "New";
+                    case rtc::PeerConnection::GatheringState::InProgress: return "InProgress";
+                    case rtc::PeerConnection::GatheringState::Complete: return "Complete";
+                    default: return "Unknown";
+                }
+            };
+            WRITE_LOG("WebRTC ICE Gathering state changed: %s", stateToString(state));
+            if (state == rtc::PeerConnection::GatheringState::Complete) {
                 auto description = m_peerConnection->localDescription();
                 if (description.has_value()) {
                     WRITE_LOG("ICE Gathering complete. Sending offer to server.");
@@ -103,12 +105,12 @@ void WebRTCPublisher::initializePeerConnection() {
         /// Signaling State回调
         m_peerConnection->onSignalingStateChange([](rtc::PeerConnection::SignalingState state) {
             auto stateToString = [](rtc::PeerConnection::SignalingState s) {
-                switch(s) {
+                switch (s) {
                     case rtc::PeerConnection::SignalingState::Stable: return "Stable";
                     case rtc::PeerConnection::SignalingState::HaveLocalOffer: return "HaveLocalOffer";
                     case rtc::PeerConnection::SignalingState::HaveRemoteOffer: return "HaveRemoteOffer";
                     case rtc::PeerConnection::SignalingState::HaveLocalPranswer: return "HaveLocalPranswer";
-                    default : return "Unknown";
+                    default: return "Unknown";
                 }
             };
             WRITE_LOG("Signaling state changed: %s", stateToString(state));
@@ -125,10 +127,10 @@ void WebRTCPublisher::initializePeerConnection() {
         audio.addOpusCodec(111, std::nullopt);
         m_audioTrack = m_peerConnection->addTrack(audio);
         WRITE_LOG("Audio track (Opus) added.");
-        
+
         // 在添加 tracks 后立即设置本地描述
         m_peerConnection->setLocalDescription();
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         QString error = QString("Failed to create PeerConnection: %1").arg(e.what());
         WRITE_LOG(error.toStdString().c_str());
         emit errorOccurred(error);
@@ -159,8 +161,9 @@ void WebRTCPublisher::stopPublishing() {
     WRITE_LOG("Stopping WebRTC publishing process...");
     emit publisherStopped();
 }
+
 //// 考虑使用datachannel库的SDP标准格式
-void WebRTCPublisher::sendOfferToSignalingServer(const std::string& sdp) {
+void WebRTCPublisher::sendOfferToSignalingServer(const std::string &sdp) {
     QJsonObject jsonPayload;
 
     jsonPayload["sdp"] = QString::fromStdString(sdp);
@@ -173,9 +176,9 @@ void WebRTCPublisher::sendOfferToSignalingServer(const std::string& sdp) {
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     WRITE_LOG("Sending Offer SDP to %s", m_signalingUrl.toStdString().c_str());
-     QNetworkReply * reply = m_networkManager->post(request, body);
-        // rtcSendMessage();
-        //
+    QNetworkReply *reply = m_networkManager->post(request, body);
+    // rtcSendMessage();
+    //
     if (!reply) {
         WRITE_LOG("ERROR: Failed to send POST request to signaling server.");
         emit errorOccurred("Failed to send offer to signaling server.");
@@ -183,7 +186,8 @@ void WebRTCPublisher::sendOfferToSignalingServer(const std::string& sdp) {
     }
     WRITE_LOG("POST request sent to signaling server.");
 }
-void WebRTCPublisher::onSignalingReply(QNetworkReply* reply) {
+
+void WebRTCPublisher::onSignalingReply(QNetworkReply *reply) {
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray response_data = reply->readAll();
         WRITE_LOG("Received response from signaling server: %s", response_data.constData());
@@ -203,26 +207,27 @@ void WebRTCPublisher::onSignalingReply(QNetworkReply* reply) {
                 } else {
                     WRITE_LOG("Error: PeerConnection is null when trying to set remote description.");
                 }
-            } catch (const std::exception& e) {
+            } catch (const std::exception &e) {
                 QString error = QString("Failed to set remote description: %1").arg(e.what());
                 WRITE_LOG(error.toStdString().c_str());
                 emit errorOccurred(error);
             }
-
         } else {
-            QString error = QString("Signaling server returned an error or invalid data: %1").arg(QString(response_data));
+            QString error = QString("Signaling server returned an error or invalid data: %1").arg(
+                QString(response_data));
             WRITE_LOG(error.toStdString().c_str());
             emit errorOccurred(error);
         }
     } else {
         QString error = QString("Signaling request failed: %1 (HTTP Status: %2)")
-            .arg(reply->errorString())
-            .arg(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
+                .arg(reply->errorString())
+                .arg(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
         WRITE_LOG(error.toStdString().c_str());
         emit errorOccurred(error);
     }
     reply->deleteLater();
 }
+
 void WebRTCPublisher::doPublishingWork() {
     if (!m_isPublishing.load()) {
         WRITE_LOG("WebRTC publishing loop finished.");
@@ -231,16 +236,17 @@ void WebRTCPublisher::doPublishingWork() {
     }
 
     AVPacketPtr packet;
-    if (m_encodedPacketQueue->dequeue(packet)) { // 使用 try_dequeue 避免阻塞
+    if (m_encodedPacketQueue->dequeue(packet)) {
+        // 使用 try_dequeue 避免阻塞
         try {
             if (packet->stream_index == 0 && m_videoTrack && m_videoTrack->isOpen()) {
                 WRITE_LOG("sending video packet, size: %d", packet->size);
-                m_videoTrack->send(reinterpret_cast<const std::byte*>(packet->data), packet->size);
+                m_videoTrack->send(reinterpret_cast<const std::byte *>(packet->data), packet->size);
             } else if (packet->stream_index == 1 && m_audioTrack && m_audioTrack->isOpen()) {
                 WRITE_LOG("sending audio packet, size: %d", packet->size);
-                m_audioTrack->send(reinterpret_cast<const std::byte*>(packet->data), packet->size);
+                m_audioTrack->send(reinterpret_cast<const std::byte *>(packet->data), packet->size);
             }
-        } catch (const std::exception& e) {
+        } catch (const std::exception &e) {
             WRITE_LOG("Exception while sending packet: %s", e.what());
         }
     }
@@ -252,7 +258,7 @@ void WebRTCPublisher::doPublishingWork() {
 void WebRTCPublisher::clear() {
     stopPublishing(); // Ensure the flag is set
 
-    if(m_peerConnection) {
+    if (m_peerConnection) {
         m_peerConnection->close();
     }
     // Let the unique_ptr handle deletion

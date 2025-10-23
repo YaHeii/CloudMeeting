@@ -1,4 +1,4 @@
-#ifndef LOG_GLOBAL_H
+﻿#ifndef LOG_GLOBAL_H
 #define LOG_GLOBAL_H
 /**
  *使用宏定义
@@ -8,12 +8,11 @@
 
 class LogQueue;
 
-struct Log
-{
+struct Log {
     QByteArray data;
 };
 
-extern LogQueue* log_instance;
+extern LogQueue *log_instance;
 //TODO:做多级错误日志处理
 #define WRITE_LOG(fmt, ...) do { \
 LogQueue::GetInstance().print(__FILE__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__); \
