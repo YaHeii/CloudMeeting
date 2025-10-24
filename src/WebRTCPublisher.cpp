@@ -12,7 +12,10 @@ extern "C" {
 }
 
 // 构造函数实现
-WebRTCPublisher::WebRTCPublisher(QUEUE_DATA<AVPacketPtr> *encodedPacketQueue, QObject *parent) : QObject(parent) {
+WebRTCPublisher::WebRTCPublisher(QUEUE_DATA<AVPacketPtr> *encodedPacketQueue, QObject *parent)
+    : QObject(parent), 
+      m_encodedPacketQueue(encodedPacketQueue)
+{
     m_networkManager = nullptr;
 }
 
@@ -29,12 +32,20 @@ WebRTCPublisher::~WebRTCPublisher() {
 
 bool WebRTCPublisher::init(const QString &signalingUrl, const QString &streamUrl) {
     WRITE_LOG("Initializing WebRTC Publisher");
-    rtcInitLogger(RTC_LOG_VERBOSE,NULL);
+    // Use C++ API to initialize libdatachannel logger and forward messages to LogQueue
+    rtc::InitLogger(rtc::LogLevel::Verbose, [](rtc::LogLevel level, rtc::string message) {
+        const char* file = "libdatachannel";
+        const char* function = "rtc_callback";
+        int line =0;
+        // forward formatted message to LogQueue
+        LogQueue::GetInstance().print(file, function, line, "%s", message.c_str());
+    });
+
     m_signalingUrl = signalingUrl;
     m_streamUrl = streamUrl;
     m_rtcConfig.iceServers.clear();
     m_rtcConfig.iceServers.emplace_back("stun:stun.l.google.com:19302"); // 添加STUN服务器
-    m_rtcConfig.mtu = 1500;
+    m_rtcConfig.mtu =1500;
     // m_rtcConfig.forceMediaTransport = true;
     initializePeerConnection();
     return true;
@@ -122,7 +133,7 @@ void WebRTCPublisher::initializePeerConnection() {
         WRITE_LOG("Video track (H.264) added.");
         rtc::Description::Audio audio("audio", rtc::Description::Direction::SendOnly);
 
-        // 添加 Opus 编解码器，使用 payload type 111
+        // 添加 Opus 编解码器，使用 payload type111
         // 同样，第二个参数 profile 是可选的
         audio.addOpusCodec(111, std::nullopt);
         m_audioTrack = m_peerConnection->addTrack(audio);
@@ -162,7 +173,7 @@ void WebRTCPublisher::stopPublishing() {
     emit publisherStopped();
 }
 
-//// 考虑使用datachannel库的SDP标准格式
+//// TODO: 考虑使用datachannel库的SDP标准格式
 void WebRTCPublisher::sendOfferToSignalingServer(const std::string &sdp) {
     QJsonObject jsonPayload;
 
@@ -172,19 +183,52 @@ void WebRTCPublisher::sendOfferToSignalingServer(const std::string &sdp) {
     QJsonDocument doc(jsonPayload);
     QByteArray body = doc.toJson();
 
-    QNetworkRequest request(m_signalingUrl);
+    QUrl url(m_signalingUrl);
+    QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     WRITE_LOG("Sending Offer SDP to %s", m_signalingUrl.toStdString().c_str());
-    QNetworkReply *reply = m_networkManager->post(request, body);
-    // rtcSendMessage();
-    //
+    QNetworkReply *reply = nullptr;
+    if (m_networkManager) {
+        reply = m_networkManager->post(request, body);
+    } else {
+        WRITE_LOG("ERROR: m_networkManager is null when sending offer.");
+        emit errorOccurred("Network manager not initialized.");
+        return;
+    }
+
     if (!reply) {
-        WRITE_LOG("ERROR: Failed to send POST request to signaling server.");
+        WRITE_LOG("ERROR: Failed to send POST request to signaling server (reply is null).");
         emit errorOccurred("Failed to send offer to signaling server.");
         return;
     }
+
+    // Log that the request object was created
     WRITE_LOG("POST request sent to signaling server.");
+
+    // Per-reply error logging
+#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
+    connect(reply, &QNetworkReply::errorOccurred, this, [reply, this](QNetworkReply::NetworkError code) {
+        WRITE_LOG("Signaling reply network error: %d", static_cast<int>(code));
+        // let onSignalingReply handle emitting error text when finished/aborted
+    });
+#else
+    connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onSignalingReply(nullptr)));
+#endif
+
+    // Safety: timeout the request if no response within10s
+    QTimer::singleShot(10000, reply, [reply]() {
+        if (!reply->isFinished()) {
+            WRITE_LOG("Signaling request timeout, aborting reply.");
+            reply->abort();
+        }
+    });
+
+    // Also ensure we process the reply even if QNetworkAccessManager::finished didn't fire for some reason
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        // reuse existing handler
+        onSignalingReply(reply);
+    });
 }
 
 void WebRTCPublisher::onSignalingReply(QNetworkReply *reply) {
@@ -195,11 +239,11 @@ void WebRTCPublisher::onSignalingReply(QNetworkReply *reply) {
         QJsonDocument jsonDoc = QJsonDocument::fromJson(response_data);
         QJsonObject jsonObj = jsonDoc.object();
 
-        if (jsonObj.contains("code") && jsonObj["code"].toInt() == 0 && jsonObj.contains("sdp")) {
+        if (jsonObj.contains("code") && jsonObj["code"].toInt() ==0 && jsonObj.contains("sdp")) {
             std::string sdpAnswer = jsonObj["sdp"].toString().toStdString();
             WRITE_LOG("Received Answer SDP from server.");
 
-            // --- 关键修改：设置远端 SDP 描述 ---
+            // ---关键修改：设置远端 SDP 描述 ---
             try {
                 if (m_peerConnection) {
                     m_peerConnection->setRemoteDescription(rtc::Description(sdpAnswer, "answer"));
@@ -234,15 +278,19 @@ void WebRTCPublisher::doPublishingWork() {
         clear();
         return;
     }
-
+    if (!m_encodedPacketQueue) {
+        WRITE_LOG("Encoded packet queue is null in doPublishingWork. Stopping publisher.");
+        clear();
+        return;
+    }
     AVPacketPtr packet;
     if (m_encodedPacketQueue->dequeue(packet)) {
         // 使用 try_dequeue 避免阻塞
         try {
-            if (packet->stream_index == 0 && m_videoTrack && m_videoTrack->isOpen()) {
+            if (packet->stream_index ==0 && m_videoTrack && m_videoTrack->isOpen()) {
                 WRITE_LOG("sending video packet, size: %d", packet->size);
                 m_videoTrack->send(reinterpret_cast<const std::byte *>(packet->data), packet->size);
-            } else if (packet->stream_index == 1 && m_audioTrack && m_audioTrack->isOpen()) {
+            } else if (packet->stream_index ==1 && m_audioTrack && m_audioTrack->isOpen()) {
                 WRITE_LOG("sending audio packet, size: %d", packet->size);
                 m_audioTrack->send(reinterpret_cast<const std::byte *>(packet->data), packet->size);
             }

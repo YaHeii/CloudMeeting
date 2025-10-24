@@ -5,6 +5,7 @@
 #include <QDateTime>
 #include <QString>
 #include <QDebug>
+#include <rtc/rtc.h>
 // #include <memory>
 // #include <queue>
 // #include "netheader.h"
@@ -38,4 +39,8 @@ private:
     QUEUE_DATA<Log> m_logQueue;
     FILE *logfile;
 };
+
+// C-linkage callback expected by libdatachannel; implemented in logqueue.cpp
+extern "C" void RTC_API WRITE_RTC_LOG(rtcLogLevel level, const char* message);
+
 #endif // LOGQUEUE_H

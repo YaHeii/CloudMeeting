@@ -88,3 +88,20 @@ void LogQueue::print(const char *file, const char *func, int line, const char *f
     log.data = std::move(log_data);
     m_logQueue.enqueue(log);
 }
+
+extern "C" RTC_API void WRITE_RTC_LOG(rtcLogLevel level, const char* message) {
+    const char* file = "libdatachannel";
+    const char* function = "rtc_callback";
+    int line =0;
+    LogQueue::GetInstance().print(
+        file,        // __FILE__
+        function,    // __FUNCTION__
+        line,        // __LINE__
+        "[%s] %s",   // fmt: 格式化字符串
+        // Note: the C API log level enum does not match our printf format, so convert level to string
+        // We'll just forward message, and include numeric level
+        "%d %s",
+        static_cast<int>(level),
+        message
+    );
+}
