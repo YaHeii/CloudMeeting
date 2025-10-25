@@ -190,7 +190,16 @@ void WebRTCPublisher::sendOfferToSignalingServer(const std::string &sdp) {
     WRITE_LOG("Sending Offer SDP to %s", m_signalingUrl.toStdString().c_str());
     QNetworkReply *reply = nullptr;
     if (m_networkManager) {
+        WRITE_LOG("NetworkManager exists, attempting POST request...");
         reply = m_networkManager->post(request, body);
+        if (reply) {
+            WRITE_LOG("POST request initiated successfully.");
+        }
+        else {
+            WRITE_LOG("ERROR: POST request initiation failed (reply is null).");
+            emit errorOccurred("Failed to create network reply object.");
+            return;
+        }
     } else {
         WRITE_LOG("ERROR: m_networkManager is null when sending offer.");
         emit errorOccurred("Network manager not initialized.");
@@ -209,8 +218,8 @@ void WebRTCPublisher::sendOfferToSignalingServer(const std::string &sdp) {
     // Per-reply error logging
 #if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
     connect(reply, &QNetworkReply::errorOccurred, this, [reply, this](QNetworkReply::NetworkError code) {
-        WRITE_LOG("Signaling reply network error: %d", static_cast<int>(code));
-        // let onSignalingReply handle emitting error text when finished/aborted
+        QString error = QString("Signaling reply network error occurred: %1 (Code: %2)").arg(reply->errorString()).arg(code);
+        WRITE_LOG(error.toStdString().c_str());
     });
 #else
     connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onSignalingReply(nullptr)));
@@ -224,14 +233,15 @@ void WebRTCPublisher::sendOfferToSignalingServer(const std::string &sdp) {
         }
     });
 
-    // Also ensure we process the reply even if QNetworkAccessManager::finished didn't fire for some reason
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        // reuse existing handler
+        WRITE_LOG("QNetworkReply finished signal received.");
         onSignalingReply(reply);
-    });
+     });
+    WRITE_LOG("Connections for reply signals established.");
 }
 
 void WebRTCPublisher::onSignalingReply(QNetworkReply *reply) {
+    WRITE_LOG("onSignalingReply called!");
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray response_data = reply->readAll();
         WRITE_LOG("Received response from signaling server: %s", response_data.constData());
