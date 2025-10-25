@@ -102,11 +102,16 @@ void WebRTCPublisher::initializePeerConnection() {
                 }
             };
             WRITE_LOG("WebRTC ICE Gathering state changed: %s", stateToString(state));
+
             if (state == rtc::PeerConnection::GatheringState::Complete) {
                 auto description = m_peerConnection->localDescription();
                 if (description.has_value()) {
                     WRITE_LOG("ICE Gathering complete. Sending offer to server.");
-                    sendOfferToSignalingServer(description.value());
+                    std::string sdp_offer = description.value();
+                    QMetaObject::invokeMethod(this, [this, sdp_offer]() {
+                        sendOfferToSignalingServer(sdp_offer);
+						}, Qt::QueuedConnection);
+                    //sendOfferToSignalingServer(description.value());
                 } else {
                     WRITE_LOG("CRITICAL: ICE Gathering is complete, but local description is NOT available.");
                     emit errorOccurred("Failed to get local SDP description after ICE gathering.");
