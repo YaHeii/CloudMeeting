@@ -1,0 +1,2 @@
+docker run -d --name srs-webrtc     -p 1935:1935     -p 1985:1985    -p 8080:8080     -p 8000:8000/udp  -v D:\code\SRSConf\my_SRS.conf:/usr/local/srs/conf/srs.conf    -e SRS_CANDIDATE="10.0.0.10"   ossrs/srs:v6.0.181     ./objs/srs -c conf/srs.conf
+docker run -d --name srs5-webrtc   -p 1935:1935    -p 1985:1985   -p 8080:8080   -p 8000:8000/udp    -v D:\code\SRSConf\my_SRS.conf:/usr/local/srs/conf/srs.conf    -e SRS_CANDIDATE="10.0.0.10"    ossrs/srs:5  ./objs/srs -c conf/srs.conf
