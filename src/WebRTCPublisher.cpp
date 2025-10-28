@@ -87,23 +87,23 @@ void WebRTCPublisher::initializePeerConnection() {
         m_peerConnection->onStateChange([this](rtc::PeerConnection::State state) {
             auto stateToString = [](rtc::PeerConnection::State s) {
                 switch (s) {
-                    case rtc::PeerConnection::State::New: return "New";
-                    case rtc::PeerConnection::State::Connecting: return "Connecting";
-                    case rtc::PeerConnection::State::Connected: return "Connected";
-                    case rtc::PeerConnection::State::Disconnected: return "Disconnected";
-                    case rtc::PeerConnection::State::Failed: return "Failed";
-                    case rtc::PeerConnection::State::Closed: return "Closed";
-                    default: return "Unknown";
+                case rtc::PeerConnection::State::New: return "New";
+                case rtc::PeerConnection::State::Connecting: return "Connecting";
+                case rtc::PeerConnection::State::Connected: return "Connected";
+                case rtc::PeerConnection::State::Disconnected: return "Disconnected";
+                case rtc::PeerConnection::State::Failed: return "Failed";
+                case rtc::PeerConnection::State::Closed: return "Closed";
+                default: return "Unknown";
                 }
-            };
-            WRITE_LOG("WebRTC PeerConnection state changed: %s", stateToString(state));
+                };
+                WRITE_LOG("WebRTC PeerConnection state changed: %s", stateToString(state));
 
-            if (state == rtc::PeerConnection::State::Connected) {
-                emit publisherStarted();
-            } else if (state == rtc::PeerConnection::State::Failed) {
-                emit errorOccurred("WebRTC connection failed.");
-                stopPublishing();
-            }
+                if (state == rtc::PeerConnection::State::Connected) {
+                    emit publisherStarted();
+                } else if (state == rtc::PeerConnection::State::Failed) {
+                    emit errorOccurred("WebRTC connection failed.");
+                    stopPublishing();
+                }
         });
         /// ICE State回调
         m_peerConnection->onGatheringStateChange([this](rtc::PeerConnection::GatheringState state) {
