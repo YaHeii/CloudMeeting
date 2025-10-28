@@ -55,16 +55,45 @@ void WebRTCPublisher::initializePeerConnection() {
         m_peerConnection = std::make_unique<rtc::PeerConnection>(m_rtcConfig);
 
         rtc::Description::Video video("video", rtc::Description::Direction::SendOnly);
-        video.addH264Codec(96, std::nullopt);
+        video.addH264Codec(96);
+        video.addSSRC(1234, "video-send");
         m_videoTrack = m_peerConnection->addTrack(video);
         WRITE_LOG("Video track (H.264) added.");
-        rtc::Description::Audio audio("audio", rtc::Description::Direction::SendOnly);
 
-        // 添加 Opus 编解码器，使用 payload type111
-        // 第二个参数 profile 是可选的
-        audio.addOpusCodec(111, std::nullopt);
+        auto rtpConfig = std::make_shared<rtc::RtpPacketizationConfig>(
+            1234,           // SSRC  
+            "video-send",   // CNAME  
+            96,             // Payload Type  
+            90000           // Clock Rate (H.264 固定为 90000)  
+        );
+
+        // 创建 H.264 打包器  
+        auto h264Packetizer = std::make_shared<rtc::H264RtpPacketizer>(
+            rtc::NalUnit::Separator::Length,  // NAL 单元分隔符  
+            rtpConfig,
+            rtc::H264RtpPacketizer::DefaultMaxFragmentSize  // 最大分片大小  
+        );
+
+        // 设置打包器到轨道  
+        m_videoTrack->setMediaHandler(h264Packetizer);
+
+        rtc::Description::Audio audio("audio", rtc::Description::Direction::SendOnly);
+        audio.addOpusCodec(111);
+        audio.addSSRC(5678, "audio-send");
         m_audioTrack = m_peerConnection->addTrack(audio);
         WRITE_LOG("Audio track (Opus) added.");
+        auto rtpConfig = std::make_shared<rtc::RtpPacketizationConfig>(
+            5678,           // SSRC  
+            "audio-send",   // CNAME  
+            111,            // Payload Type  
+            48000           // Clock Rate (Opus 固定为 48000)  
+        );
+
+        // 创建 Opus 打包器  
+        auto opusPacketizer = std::make_shared<rtc::OpusRtpPacketizer>(rtpConfig);
+
+        // 设置打包器到轨道  
+        m_audioTrack->setMediaHandler(opusPacketizer);
 
         // 在添加 tracks 后立即设置本地描述
         m_peerConnection->setLocalDescription();

@@ -250,7 +250,7 @@ void MainWindow::on_createmeetBtn_clicked() {
         QString rtmpUrl = "rtmp://127.0.0.1:1935/live/teststream";
         qDebug() << "Joining meeting...";
         QString webRTCsignalingUrl = "http://10.0.0.10:1985/rtc/v1/publish/";
-        QString webRTCstreamUrl = "webrtc://10.0.0.10/live/teststream"; // WebRTC 的流地址
+        QString webRTCstreamUrl = "webrtc://10.0.0.10/live/teststream"; 
 
 
         AVCodecContext *videoCtx = m_videoEncoder->getCodecContext();

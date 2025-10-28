@@ -1,0 +1,279 @@
+[2025-10-28 11:33:30.211] <WebRTCPublisher.cpp:WebRTCPublisher::init:33> Initializing WebRTC Publisher
+[2025-10-28 11:33:30.227] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.227] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::PeerConnection@50: Creating PeerConnection
+[2025-10-28 11:33:30.227] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::PeerConnection@77: MTU set to 1500
+[2025-10-28 11:33:30.227] <libdatachannel:rtc_callback:0> rtc::impl::Certificate::Generate@445: Generating certificate (OpenSSL)
+[2025-10-28 11:33:30.229] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.228] <libdatachannel:rtc_callback:0> rtc::impl::Certificate::Generate@461: Generating ECDSA P-256 key pair
+[2025-10-28 11:33:30.230] <WebRTCPublisher.cpp:WebRTCPublisher::initializePeerConnection:60> Video track (H.264) added.
+[2025-10-28 11:33:30.230] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:72> ffmpegDecoder::startDecoding
+[2025-10-28 11:33:30.231] <WebRTCPublisher.cpp:WebRTCPublisher::initializePeerConnection:67> Audio track (Opus) added.
+[2025-10-28 11:33:30.231] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.231] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.231] <libdatachannel:rtc_callback:0> rtc::PeerConnection::setLocalDescription@85: Setting local description, type=unspec
+[2025-10-28 11:33:30.231] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::initIceTransport@160: Starting ICE transport
+[2025-10-28 11:33:30.232] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::IceTransport@58: Initializing ICE transport (libjuice)
+[2025-10-28 11:33:30.232] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::IceTransport@113: Using STUN server "stun.l.google.com:19302"
+[2025-10-28 11:33:30.232] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:78: Creating agent
+[2025-10-28 11:33:30.233] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: ice.c:157: Created local description: ufrag="E4Ji", pwd="5JaYTh0SsS1u6PSJDZ/vFv"
+[2025-10-28 11:33:30.233] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:472: Generated local SDP description: a=ice-ufrag:E4Ji
+a=ice-pwd:5JaYTh0SsS1u6PSJDZ/vFv
+a=ice-options:ice2,trickle
+
+[2025-10-28 11:33:30.234] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:475: Assuming controlling mode
+[2025-10-28 11:33:30.235] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::populateLocalDescription@1007: Adding media to local description, mid="video", removed=false
+[2025-10-28 11:33:30.235] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::populateLocalDescription@1007: Adding media to local description, mid="audio", removed=false
+[2025-10-28 11:33:30.245] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::processLocalDescription@1040: Issuing local description: v=0
+o=rtc 2221717408 0 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=group:BUNDLE video audio
+a=group:LS video audio
+a=msid-semantic:WMS *
+a=ice-options:ice2,trickle
+a=fingerprint:sha-256 C1:38:29:03:35:8F:3F:0F:F4:6A:5C:E3:85:F2:4E:A6:79:77:CE:41:EB:12:52:E2:9C:01:69:8E:D2:C5:28:32
+m=video 9 UDP/TLS/RTP/SAVPF 96
+c=IN IP4 0.0.0.0
+a=mid:video
+a=sendonly
+a=rtcp-mux
+a=rtpmap:96 H264/90000
+a=rtcp-fb:96 nack
+a=rtcp-fb:96 nack pli
+a=rtcp-fb:96 goog-remb
+a=setup:actpass
+a=ice-ufrag:E4Ji
+a=ice-pwd:5JaYTh0SsS1u6PSJDZ/vFv
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=mid:audio
+a=sendonly
+a=rtcp-mux
+a=rtpmap:111 opus/48000/2
+a=setup:actpass
+a=ice-ufrag:E4Ji
+a=ice-pwd:5JaYTh0SsS1u6PSJDZ/vFv
+
+[2025-10-28 11:33:30.246] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::changeSignalingState@1368: Changed signaling state to have-local-offer
+[2025-10-28 11:33:30.246] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::changeGatheringState@1355: Changed gathering state to in-progress
+[2025-10-28 11:33:30.246] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:215: Gathering candidates
+[2025-10-28 11:33:30.246] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:1158: Changing state to gathering
+[2025-10-28 11:33:30.246] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn.c:65: Creating connections registry
+[2025-10-28 11:33:30.248] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: udp.c:166: Opening UDP socket for IPv6 family
+[2025-10-28 11:33:30.249] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: udp.c:96: UDP socket bound to localhost:55702
+[2025-10-28 11:33:30.249] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:93: Starting connections thread
+[2025-10-28 11:33:30.250] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn.c:144: Creating connection
+[2025-10-28 11:33:30.250] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: udp.c:166: Opening UDP socket for IPv6 family
+[2025-10-28 11:33:30.251] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: udp.c:96: UDP socket bound to any:55703
+[2025-10-28 11:33:30.251] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:299: Entering poll on 1 sockets for 0 ms
+[2025-10-28 11:33:30.251] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:378: Interrupting connections thread
+[2025-10-28 11:33:30.252] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:301: Leaving poll
+[2025-10-28 11:33:30.252] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:251: Adding 2 local host candidates
+[2025-10-28 11:33:30.252] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:285: Gathered host candidate: a=candidate:1 1 UDP 2122317823 172.24.64.1 55703 typ host
+[2025-10-28 11:33:30.252] <libdatachannel:rtc_callback:0> rtc::Candidate::parse@90: Parsing candidate: 1 1 UDP 2122317823 172.24.64.1 55703 typ host
+[2025-10-28 11:33:30.252] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::processLocalCandidate@1077: Issuing local candidate: a=candidate:1 1 UDP 2122317823 172.24.64.1 55703 typ host
+[2025-10-28 11:33:30.252] <libdatachannel:rtc_callback:0> rtc::Candidate::resolve@152: Resolving candidate (mode=simple): 172.24.64.1 55703
+[2025-10-28 11:33:30.252] <libdatachannel:rtc_callback:0> rtc::Candidate::resolve@187: Resolved candidate: 172.24.64.1 55703
+[2025-10-28 11:33:30.252] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:285: Gathered host candidate: a=candidate:2 1 UDP 2122317567 10.0.0.10 55703 typ host
+[2025-10-28 11:33:30.252] <libdatachannel:rtc_callback:0> rtc::Candidate::parse@90: Parsing candidate: 2 1 UDP 2122317567 10.0.0.10 55703 typ host
+[2025-10-28 11:33:30.252] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::processLocalCandidate@1077: Issuing local candidate: a=candidate:2 1 UDP 2122317567 10.0.0.10 55703 typ host
+[2025-10-28 11:33:30.253] <libdatachannel:rtc_callback:0> rtc::Candidate::resolve@152: Resolving candidate (mode=simple): 10.0.0.10 55703
+[2025-10-28 11:33:30.253] <libdatachannel:rtc_callback:0> rtc::Candidate::resolve@187: Resolved candidate: 10.0.0.10 55703
+[2025-10-28 11:33:30.253] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:1158: Changing state to connecting
+[2025-10-28 11:33:30.253] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::changeIceState@1337: Changed ICE state to checking
+[2025-10-28 11:33:30.254] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::changeState@1319: Changed state to connecting
+[2025-10-28 11:33:30.254] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:829: Bookkeeping...
+[2025-10-28 11:33:30.254] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:378: Interrupting connections thread
+[2025-10-28 11:33:30.254] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:299: Entering poll on 1 sockets for 0 ms
+[2025-10-28 11:33:30.254] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:297: Starting resolver thread for servers
+[2025-10-28 11:33:30.254] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:301: Leaving poll
+[2025-10-28 11:33:30.255] <WebRTCPublisher.cpp:WebRTCPublisher::startPublishing:166> Starting WebRTC Publishing
+[2025-10-28 11:33:30.255] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:829: Bookkeeping...
+[2025-10-28 11:33:30.256] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:299: Entering poll on 1 sockets for 60000 ms
+[2025-10-28 11:33:30.265] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:437: Using STUN server stun.l.google.com:19302
+[2025-10-28 11:33:30.265] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:442: Registering STUN entry 0 for server request
+[2025-10-28 11:33:30.265] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:2481: Updating gathering status
+[2025-10-28 11:33:30.266] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:2486: STUN server or relay entry 0 is still pending
+[2025-10-28 11:33:30.266] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:378: Interrupting connections thread
+[2025-10-28 11:33:30.266] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:301: Leaving poll
+[2025-10-28 11:33:30.266] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:829: Bookkeeping...
+[2025-10-28 11:33:30.267] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:851: STUN entry 0: Sending request to 74.125.250.129:19302 (5 retransmissions left)
+[2025-10-28 11:33:30.267] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:1583: Sending STUN Binding request
+[2025-10-28 11:33:30.267] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: stun.c:110: Writing STUN message, class=0x0, method=0x1
+[2025-10-28 11:33:30.267] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: stun.c:413: Writing STUN attribute type 0x8022, length=8
+[2025-10-28 11:33:30.267] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: stun.c:413: Writing STUN attribute type 0x8028, length=4
+[2025-10-28 11:33:30.267] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:411: Sending datagram, size=40
+[2025-10-28 11:33:30.268] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:299: Entering poll on 1 sockets for 500 ms
+[2025-10-28 11:33:30.273] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.275] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.277] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:72> ffmpegDecoder::startDecoding
+[2025-10-28 11:33:30.277] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.278] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.304] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.306] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.307] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:72> ffmpegDecoder::startDecoding
+[2025-10-28 11:33:30.308] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.308] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.335] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.336] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.338] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:72> ffmpegDecoder::startDecoding
+[2025-10-28 11:33:30.339] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.339] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.367] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.368] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.371] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:72> ffmpegDecoder::startDecoding
+[2025-10-28 11:33:30.372] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.372] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.400] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.401] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.402] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:72> ffmpegDecoder::startDecoding
+[2025-10-28 11:33:30.403] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.403] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.432] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.434] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.435] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:72> ffmpegDecoder::startDecoding
+[2025-10-28 11:33:30.436] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.436] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.447] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:301: Leaving poll
+[2025-10-28 11:33:30.447] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:191: Receiving datagram
+[2025-10-28 11:33:30.447] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:765: Received datagram, size=32
+[2025-10-28 11:33:30.447] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:779: Received STUN datagram from 74.125.250.129:19302
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: stun.c:535: Reading STUN message, class=0x100, method=0x1
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: stun.c:629: Reading attribute 0x20, length=8
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: stun.c:655: Reading XOR mapped address
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: stun.c:1050: Reading IPv4 address
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: stun.c:552: Finished reading STUN attributes
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:1273: STUN message is a response, looking for transaction ID
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:2546: STUN entry 0 matching incoming transaction ID
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:1431: Received STUN Binding success response from server
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:1434: STUN server binding successful
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:1448: Response has mapped address
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:1453: Got STUN mapped address 111.43.134.139:55703 from server
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:2244: Gathered reflexive candidate: a=candidate:3 1 UDP 1686109695 111.43.134.139 55703 typ srflx raddr 0.0.0.0 rport 0
+[2025-10-28 11:33:30.448] <libdatachannel:rtc_callback:0> rtc::Candidate::parse@90: Parsing candidate: 3 1 UDP 1686109695 111.43.134.139 55703 typ srflx raddr 0.0.0.0 rport 0
+[2025-10-28 11:33:30.450] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::processLocalCandidate@1077: Issuing local candidate: a=candidate:3 1 UDP 1686109695 111.43.134.139 55703 typ srflx raddr 0.0.0.0 rport 0
+[2025-10-28 11:33:30.450] <libdatachannel:rtc_callback:0> rtc::Candidate::resolve@152: Resolving candidate (mode=simple): 111.43.134.139 55703
+[2025-10-28 11:33:30.450] <libdatachannel:rtc_callback:0> rtc::Candidate::resolve@187: Resolved candidate: 111.43.134.139 55703
+[2025-10-28 11:33:30.451] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:2481: Updating gathering status
+[2025-10-28 11:33:30.451] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:2491: Candidate gathering done
+[2025-10-28 11:33:30.451] <libdatachannel:rtc_callback:0> rtc::impl::PeerConnection::changeGatheringState@1355: Changed gathering state to complete
+[2025-10-28 11:33:30.451] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:191: Receiving datagram
+[2025-10-28 11:33:30.451] <WebRTCPublisher.cpp:WebRTCPublisher::initializePeerConnection::<lambda_3>::operator ():118> WebRTC ICE Gathering state changed: Complete
+[2025-10-28 11:33:30.451] <WebRTCPublisher.cpp:WebRTCPublisher::initializePeerConnection::<lambda_3>::operator ():123> ICE Gathering complete. Sending offer to server.
+[2025-10-28 11:33:30.451] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:199: No more datagrams to receive
+[2025-10-28 11:33:30.451] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: agent.c:829: Bookkeeping...
+[2025-10-28 11:33:30.451] <libdatachannel:rtc_callback:0> rtc::impl::IceTransport::LogCallback@390: juice: conn_poll.c:299: Entering poll on 1 sockets for 15000 ms
+[2025-10-28 11:33:30.451] <WebRTCPublisher.cpp:WebRTCPublisher::initializePeerConnection::<lambda_3>::operator ():125> Local SDP Offer:
+v=0
+o=rtc 2221717408 0 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=group:BUNDLE video audio
+a=group:LS video audio
+a=msid-semantic:WMS *
+a=ice-options:ice2,trickle
+a=fingerprint:sha-256 C1:38:29:03:35:8F:3F:0F:F4:6A:5C:E3:85:F2:4E:A6:79:77:CE:41:EB:12:52:E2:9C:01:69:8E:D2:C5:28:32
+m=video 55703 UDP/TLS/RTP/SAVPF 96
+c=IN IP4 172.24.64.1
+a=mid:video
+a=sendonly
+a=rtcp-mux
+a=rtpmap:96 H264/90000
+a=rtcp-fb:96 nack
+a=rtcp-fb:96 nack pli
+a=rtcp-fb:96 goog-remb
+a=setup:actpass
+a=ice-ufrag:E4Ji
+a=ice-pwd:5JaYTh0SsS1u6PSJDZ/vFv
+a=candidate:1 1 UDP 2122317823 172.24.64.1 55703 typ host
+a=candidate:2 1 UDP 2122317567 10.0.0.10 55703 typ host
+a=candidate:3 1 UDP 1686109695 111.43.134.139 55703 typ srflx raddr 0.0.0.0 rport 0
+a=end-of-candidates
+m=audio 55703 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 172.24.64.1
+a=mid:audio
+a=sendonly
+a=rtcp-mux
+a=rtpmap:111 opus/48000/2
+a=setup:actpass
+a=ice-ufrag:E4Ji
+a=ice-pwd:5JaYTh0SsS1u6PSJDZ/vFv
+
+[2025-10-28 11:33:30.452] <WebRTCPublisher.cpp:WebRTCPublisher::sendOfferToSignalingServer:194> Sending Offer SDP to http://10.0.0.10:1985/rtc/v1/publish/
+[2025-10-28 11:33:30.452] <WebRTCPublisher.cpp:WebRTCPublisher::sendOfferToSignalingServer:197> NetworkManager exists, attempting POST request...
+[2025-10-28 11:33:30.453] <WebRTCPublisher.cpp:WebRTCPublisher::sendOfferToSignalingServer:200> POST request initiated successfully.
+[2025-10-28 11:33:30.453] <WebRTCPublisher.cpp:WebRTCPublisher::sendOfferToSignalingServer:220> POST request sent to signaling server.
+[2025-10-28 11:33:30.453] <WebRTCPublisher.cpp:WebRTCPublisher::sendOfferToSignalingServer:244> Connections for reply signals established.
+[2025-10-28 11:33:30.466] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.468] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.469] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:72> ffmpegDecoder::startDecoding
+[2025-10-28 11:33:30.470] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.470] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.498] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.500] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:104> decoding.
+[2025-10-28 11:33:30.502] <ffmpegVideoDecoder.cpp:ffmpegVideoDecoder::doDecodingPacket:72> ffmpegDecoder::startDecoding
+[2025-10-28 11:33:30.502] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.503] <ffmpegEncoder.cpp:ffmpegEncoder::doEncodingWork:144> Encoding
+[2025-10-28 11:33:30.516] <WebRTCPublisher.cpp:WebRTCPublisher::onSignalingReply:248> onSignalingReply called!
+[2025-10-28 11:33:30.516] <WebRTCPublisher.cpp:WebRTCPublisher::onSignalingReply:251> Received response from signaling server: {"code":0,"server":"vid-ki8te26","service":"1w463419","pid":"1","sdp":"v=0\r\no=SRS/6.0.181(Hang) 111143798179856 2 IN IP4 0.0.0.0\r\ns=SRSPublishSession\r\nt=0 0\r\na=ice-lite\r\na=msid-semantic: WMS live/teststream\r\n","sessionid":"7070u2s0:E4Ji"}
+[2025-10-28 11:33:30.516] <WebRTCPublisher.cpp:WebRTCPublisher::onSignalingReply:258> Received Answer SDP from server.
+[2025-10-28 11:33:30.517] <libdatachannel:rtc_callback:0> rtc::PeerConnection::setRemoteDescription@184: Setting remote description: v=0
+o=SRS/6.0.181(Hang) 111143798179856 0 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=msid-semantic:WMS *
+a=ice-lite
+a=msid-semantic: WMS live/teststream
+
+[2025-10-28 11:33:30.518] <WebRTCPublisher.cpp:WebRTCPublisher::onSignalingReply:270> Failed to set remote description: Remote description has no ICE user fragment
+[2025-10-28 11:33:30.518] <WebRTCPublisher.cpp:WebRTCPublisher::sendOfferToSignalingServer::<lambda_3>::operator ():241> QNetworkReply finished signal received.
+[2025-10-28 11:33:30.518] <mainwindow.cpp:MainWindow::handleError:328> Failed to set remote description: Remote description has no ICE user fragment
+[2025-10-28 11:33:30.519] <WebRTCPublisher.cpp:WebRTCPublisher::onSignalingReply:248> onSignalingReply called!
+[2025-10-28 11:33:30.519] <WebRTCPublisher.cpp:WebRTCPublisher::onSignalingReply:251> Received response from signaling server: 
+[2025-10-28 11:33:30.519] <WebRTCPublisher.cpp:WebRTCPublisher::onSignalingReply:276> Signaling server returned an error or invalid data: 
+
+
+
+
+SRS»’÷æ£∫
+[2025-10-28 03:33:30.510][INFO][1][216p231a] new live source, stream_url=/live/teststream
+
+[2025-10-28 03:33:30.511][INFO][1][216p231a] RTC: Init tracks  ok
+
+[2025-10-28 03:33:30.511][INFO][1][216p231a] Best matched ip=172.17.0.2, ifname=eth0
+
+[2025-10-28 03:33:30.511][INFO][1][216p231a] RTC: Use candidates 10.0.0.10, 172.17.0.2, protocol=udp
+
+[2025-10-28 03:33:30.514][INFO][1][216p231a] RTC init session, user=7070u2s0:E4Ji, url=/live/teststream, encrypt=1/1, DTLS(role=passive, version=auto), timeout=30000ms, nack=1
+
+[2025-10-28 03:33:30.514][INFO][1][216p231a] RTC username=7070u2s0:E4Ji, offer=944B, answer=149B
+
+[2025-10-28 03:33:30.514][INFO][1][216p231a] RTC remote offer: v=0\r\no=rtc 2221717408 0 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE video audio\r\na=group:LS video audio\r\na=msid-semantic:WMS *\r\na=ice-options:ice2,trickle\r\na=fingerprint:sha-256 C1:38:29:03:35:8F:3F:0F:F4:6A:5C:E3:85:F2:4E:A6:79:77:CE:41:EB:12:52:E2:9C:01:69:8E:D2:C5:28:32\r\nm=video 55703 UDP/TLS/RTP/SAVPF 96\r\nc=IN IP4 172.24.64.1\r\na=mid:video\r\na=sendonly\r\na=rtcp-mux\r\na=rtpmap:96 H264/90000\r\na=rtcp-fb:96 nack\r\na=rtcp-fb:96 nack pli\r\na=rtcp-fb:96 goog-remb\r\na=setup:actpass\r\na=ice-ufrag:E4Ji\r\na=ice-pwd:5JaYTh0SsS1u6PSJDZ/vFv\r\na=candidate:1 1 UDP 2122317823 172.24.64.1 55703 typ host\r\na=candidate:2 1 UDP 2122317567 10.0.0.10 55703 typ host\r\na=candidate:3 1 UDP 1686109695 111.43.134.139 55703 typ srflx raddr 0.0.0.0 rport 0\r\na=end-of-candidates\r\nm=audio 55703 UDP/TLS/RTP/SAVPF 111\r\nc=IN IP4 172.24.64.1\r\na=mid:audio\r\na=sendonly\r\na=rtcp-mux\r\na=rtpmap:111 opus/48000/2\r\na=setup:actpass\r\na=ice-ufrag:E4Ji\r\na=ice-pwd:5JaYTh0SsS1u6PSJDZ/vFv\r\n
+
+[2025-10-28 03:33:30.514][INFO][1][216p231a] RTC local answer: v=0\r\no=SRS/6.0.181(Hang) 111143798179856 2 IN IP4 0.0.0.0\r\ns=SRSPublishSession\r\nt=0 0\r\na=ice-lite\r\na=msid-semantic: WMS live/teststream\r\n
+
+[2025-10-28 03:33:30.516][INFO][1][216p231a] TCP: before dispose resource(HttpConn)(0x6515ae9bc260), conns=1, zombies=0, ign=0, inz=0, ind=0
+
+[2025-10-28 03:33:30.516][WARN][1][216p231a][104] client disconnect peer. ret=1007
+
+[2025-10-28 03:33:30.516][INFO][1][i3b3f9k6] TCP: clear zombies=1 resources, conns=1, removing=0, unsubs=0
+
+[2025-10-28 03:33:30.516][INFO][1][216p231a] TCP: disposing #0 resource(HttpConn)(0x6515ae9bc260), conns=1, disposing=1, zombies=0
+
+[2025-10-28 03:33:32.464][INFO][1][0d415rw3] Hybrid cpu=2.00%,24MB, cid=3,1, timer=62,1,6, clock=1,45,3,0,0,0,0,0,0, free=1
+
+[2025-10-28 03:33:32.464][INFO][1][0d415rw3] RTC: Server conns=1
+
+[2025-10-28 03:33:32.474][INFO][1][84a8nl1b] Live: cleanup die source, id=[], total=1
+
+[2025-10-28 03:33:36.468][INFO][1][o5717589] sig=15, user terminate program, fast quit
+
+[2025-10-28 03:33:36.476][INFO][1][o5717589] cleanup for quit signal fast=1, grace=0
+
+[2025-10-28 03:33:36.477][WARN][1][o5717589][11] main cycle terminated, system quit normally.
+
+[2025-10-28 03:33:36.477][WARN][1][8u1998he][4] inotify ignore read failed, nn=-1
+
+[2025-10-28 03:33:36.577][INFO][1][o5717589] srs disposed
+
+[2025-10-28 03:33:36.577][INFO][1][o5717589] srs terminated
