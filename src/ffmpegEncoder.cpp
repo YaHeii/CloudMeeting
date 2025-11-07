@@ -16,11 +16,69 @@ ffmpegEncoder::ffmpegEncoder(QUEUE_DATA<AVFramePtr> *frameQueue, QUEUE_DATA<AVPa
 ffmpegEncoder::~ffmpegEncoder() {
     clear();
 }
-
-// 编码固定参数，忽略采集参数
-bool ffmpegEncoder::initAudioEncoder(AVCodecParameters *aparams) {
+bool ffmpegEncoder::initAudioEncoderAAC(AVCodecParameters* aparams) {
+	WRITE_LOG("Initializing Audio AAC Encoder...");
     m_mediaType = AVMEDIA_TYPE_AUDIO;
-    // const AVCodec* codec = avcodec_find_encoder_by_name("aac"); // 使用AAC编码器
+    const AVCodec* codec = nullptr;
+    codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
+    if (!codec) {
+        codec = avcodec_find_encoder_by_name("libfdk_aac");
+    }
+    if (!codec) {
+        emit errorOccurred("Codec AAC not found.");
+        return false;
+    }
+
+    m_codecCtx = avcodec_alloc_context3(codec);
+    if (!m_codecCtx) {
+        emit errorOccurred("Failed to allocate codec context.");
+        return false;
+    }
+    int sample_rate = 48000;
+    int nb_channels = 1;
+    if (aparams) {
+        if (aparams->sample_rate > 0) sample_rate = aparams->sample_rate;
+        if (aparams->ch_layout.nb_channels > 0) nb_channels = aparams->ch_layout.nb_channels;
+    }
+
+    m_codecCtx->sample_rate = sample_rate;
+    av_channel_layout_default(&m_codecCtx->ch_layout, nb_channels);
+    m_codecCtx->sample_fmt = AV_SAMPLE_FMT_FLTP;
+    m_codecCtx->bit_rate = 128000; //128 kbps
+    m_codecCtx->time_base = { 1, m_codecCtx->sample_rate };
+
+    if (codec->id == AV_CODEC_ID_AAC) {
+        // nothing additional required for native aac
+    }
+    else {
+        // try to set some libfdk_aac options if used
+        if (av_opt_set(m_codecCtx->priv_data, "bitrate", "128000", 0) < 0) {
+        }
+    }
+
+    m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+
+    if (avcodec_open2(m_codecCtx, codec, nullptr) < 0) {
+        emit errorOccurred("Failed to open audio codec.");
+        avcodec_free_context(&m_codecCtx);
+        return false;
+    }
+
+    AudioResampleConfig config;
+    config.frame_size = m_codecCtx->frame_size;
+    config.sample_rate = m_codecCtx->sample_rate;
+    config.sample_fmt = m_codecCtx->sample_fmt;
+    config.ch_layout = m_codecCtx->ch_layout;
+    emit audioEncoderReady(config);
+    emit initializationSuccess();
+    WRITE_LOG("Audio AAC encoder initialized successfully. Frame size: %d", m_codecCtx->frame_size);
+    return true;
+}
+
+bool ffmpegEncoder::initAudioEncoderOpus(AVCodecParameters *aparams) {
+	WRITE_LOG("Initializing Audio Opus Encoder...");
+    m_mediaType = AVMEDIA_TYPE_AUDIO;
+    // Prefer native AAC encoder if available
     const AVCodec *codec = avcodec_find_encoder_by_name("libopus");
     if (!codec) {
         emit errorOccurred("Codec opus not found.");
@@ -32,17 +90,6 @@ bool ffmpegEncoder::initAudioEncoder(AVCodecParameters *aparams) {
         emit errorOccurred("Failed to allocate codec context.");
         return false;
     }
-
-    // // 设置音频编码参数
-    // m_codecCtx->sample_rate = aparams->sample_rate;
-    // if (aparams->ch_layout.order ==AV_CHANNEL_ORDER_UNSPEC) {
-    //     av_channel_layout_default(&m_codecCtx->ch_layout, aparams->ch_layout.nb_channels);
-    // }else {
-    //     av_channel_layout_copy(&m_codecCtx->ch_layout, &aparams->ch_layout);
-    // }
-    // m_codecCtx->sample_fmt = AV_SAMPLE_FMT_FLTP; // AAC常用格式
-    // m_codecCtx->bit_rate = 128000; // 128 kbps
-    // m_codecCtx->time_base = {1, m_codecCtx->sample_rate};
 
     m_codecCtx->sample_rate = 48000;
     av_channel_layout_default(&m_codecCtx->ch_layout, 1); //单声道
@@ -68,12 +115,13 @@ bool ffmpegEncoder::initAudioEncoder(AVCodecParameters *aparams) {
     config.ch_layout = m_codecCtx->ch_layout;
     emit audioEncoderReady(config);
     emit initializationSuccess();
-    // emit initializationSuccess();
+
     WRITE_LOG("Opus encoder initialized successfully. Frame size: %d", m_codecCtx->frame_size);
     return true;
 }
 
-bool ffmpegEncoder::initVideoEncoder(AVCodecParameters *vparams) {
+bool ffmpegEncoder::initVideoEncoderH264(AVCodecParameters *vparams) {
+	WRITE_LOG("Initializing Video H.264 Encoder...");
     m_mediaType = AVMEDIA_TYPE_VIDEO;
     const AVCodec *codec = avcodec_find_encoder_by_name("libx264"); // 使用H.264 编码器
     if (!codec) {
@@ -94,7 +142,6 @@ bool ffmpegEncoder::initVideoEncoder(AVCodecParameters *vparams) {
     m_codecCtx->time_base = {1, 25}; // 25 fps
     m_codecCtx->framerate = {25, 1};
     m_codecCtx->bit_rate = 2000000; // 2 Mbps
-    // 更多参数...
     m_codecCtx->gop_size = 25;
     m_codecCtx->max_b_frames = 1;
     av_opt_set(m_codecCtx->priv_data, "preset", "ultrafast", 0);
@@ -141,8 +188,8 @@ void ffmpegEncoder::doEncodingWork() { {
             while (ret >= 0) {
                 AVPacketPtr packet(av_packet_alloc());
                 ret = avcodec_receive_packet(m_codecCtx, packet.get());
-                WRITE_LOG("Encoding");
-                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+                //WRITE_LOG("Encoding");    ////判断编码循环是否正常时开启
+                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {////数据空或编码结束
                     break;
                 } else if (ret < 0) {
                     emit errorOccurred("Error receiving packet from encoder.");

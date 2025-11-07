@@ -55,9 +55,10 @@ signals:
     void initializationSuccess();
 
 public slots:
-    bool initVideoEncoder(AVCodecParameters *vparams);
+    bool initVideoEncoderH264(AVCodecParameters *vparams);
 
-    bool initAudioEncoder(AVCodecParameters *aparams);
+    bool initAudioEncoderAAC(AVCodecParameters *aparams);
+    bool initAudioEncoderOpus(AVCodecParameters* aparams);
 
     void startEncoding();
 

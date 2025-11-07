@@ -100,8 +100,8 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         }
         return;
     }
+	WRITE_LOG("Packet sent to decoder.");
     while (m_isDecoding) {
-        WRITE_LOG("decoding.");
         int ret = avcodec_receive_frame(m_codecCtx, decodedFrame.get());
         if (ret < 0) {
             // EAGAIN 或 EOF 表示这个包已经处理完了，可以跳出内层循环

@@ -46,6 +46,8 @@ private:
     QNetworkAccessManager *m_networkManager;
     QString m_signalingUrl;
     QString m_streamUrl;
+
+    std::string cleanupSdp(const std::string& originalSdp);
 signals:
     void errorOccurred(const QString &errorText);
 

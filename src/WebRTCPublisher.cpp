@@ -6,12 +6,13 @@
 #include <QTimer>
 #include <chrono>
 #include <memory>
-
+#include <sstream> // 需要包含头文件
+//// TODO: SRS服务器不兼容，无法返回完整SDP
+//// 考虑更换服务器测试
 extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
-// 构造函数实现
 WebRTCPublisher::WebRTCPublisher(QUEUE_DATA<AVPacketPtr> *encodedPacketQueue, QObject *parent)
     : QObject(parent), 
       m_encodedPacketQueue(encodedPacketQueue)
@@ -24,14 +25,16 @@ void WebRTCPublisher::initThread() {
     rtcPreload();
     connect(m_networkManager, &QNetworkAccessManager::finished, this, &WebRTCPublisher::onSignalingReply);
 }
-// 析构函数实现
+
 WebRTCPublisher::~WebRTCPublisher() {
     clear();
 }
 
 bool WebRTCPublisher::init(const QString &signalingUrl, const QString &streamUrl) {
+
     WRITE_LOG("Initializing WebRTC Publisher");
-    // Use C++ API to initialize libdatachannel logger and forward messages to LogQueue
+
+    // 初始化dc日志系统，使用内置日志系统输出
     rtc::InitLogger(rtc::LogLevel::Verbose, [](rtc::LogLevel level, rtc::string message) {
         const char* file = "libdatachannel";
         const char* function = "rtc_callback";
@@ -43,7 +46,7 @@ bool WebRTCPublisher::init(const QString &signalingUrl, const QString &streamUrl
     m_signalingUrl = signalingUrl;
     m_streamUrl = streamUrl;
     m_rtcConfig.iceServers.clear();
-    m_rtcConfig.iceServers.emplace_back("stun:stun.l.google.com:19302"); // 添加STUN服务器
+    m_rtcConfig.iceServers.emplace_back("stun:stun.l.google.com:19302");
     m_rtcConfig.mtu =1500;
     // m_rtcConfig.forceMediaTransport = true;
     initializePeerConnection();
@@ -53,50 +56,54 @@ bool WebRTCPublisher::init(const QString &signalingUrl, const QString &streamUrl
 void WebRTCPublisher::initializePeerConnection() {
     try {
         m_peerConnection = std::make_unique<rtc::PeerConnection>(m_rtcConfig);
-
+        /// 创建video部分的SDP与打包
+        //SDP
         rtc::Description::Video video("video", rtc::Description::Direction::SendOnly);
         video.addH264Codec(96);
-        video.addSSRC(1234, "video-send");
+        video.addRtxCodec(97, 96, 90000);
+        //video.addUlpfecCodec(98);
+        video.addSSRC(42, "video-send");
+
         m_videoTrack = m_peerConnection->addTrack(video);
         WRITE_LOG("Video track (H.264) added.");
 
-        auto rtpConfig = std::make_shared<rtc::RtpPacketizationConfig>(
-            1234,           // SSRC  
+		// rtp打包配置
+        auto VideortpConfig = std::make_shared<rtc::RtpPacketizationConfig>(
+            42,           // SSRC  
             "video-send",   // CNAME  
             96,             // Payload Type  
             90000           // Clock Rate (H.264 固定为 90000)  
         );
-
         // 创建 H.264 打包器  
         auto h264Packetizer = std::make_shared<rtc::H264RtpPacketizer>(
-            rtc::NalUnit::Separator::Length,  // NAL 单元分隔符  
-            rtpConfig,
+            rtc::NalUnit::Separator::LongStartSequence,  // NAL 单元分隔符  
+            VideortpConfig,
             rtc::H264RtpPacketizer::DefaultMaxFragmentSize  // 最大分片大小  
         );
-
         // 设置打包器到轨道  
         m_videoTrack->setMediaHandler(h264Packetizer);
 
+		/// 创建audio部分的SDP与打包
+        /// SDP
         rtc::Description::Audio audio("audio", rtc::Description::Direction::SendOnly);
         audio.addOpusCodec(111);
-        audio.addSSRC(5678, "audio-send");
+        audio.addSSRC(43, "audio-send");
         m_audioTrack = m_peerConnection->addTrack(audio);
         WRITE_LOG("Audio track (Opus) added.");
-        auto rtpConfig = std::make_shared<rtc::RtpPacketizationConfig>(
-            5678,           // SSRC  
+
+		// rtp打包配置
+        auto AudiortpConfig = std::make_shared<rtc::RtpPacketizationConfig>(
+            43,           // SSRC  
             "audio-send",   // CNAME  
             111,            // Payload Type  
             48000           // Clock Rate (Opus 固定为 48000)  
         );
-
         // 创建 Opus 打包器  
-        auto opusPacketizer = std::make_shared<rtc::OpusRtpPacketizer>(rtpConfig);
-
+        auto opusPacketizer = std::make_shared<rtc::OpusRtpPacketizer>(AudiortpConfig);
         // 设置打包器到轨道  
         m_audioTrack->setMediaHandler(opusPacketizer);
 
-        // 在添加 tracks 后立即设置本地描述
-        m_peerConnection->setLocalDescription();
+
 
         /// description回调
         m_peerConnection->onLocalDescription([this](const rtc::Description &description) {
@@ -110,7 +117,7 @@ void WebRTCPublisher::initializePeerConnection() {
                     default: return "Unknown";
                 }
             };
-            WRITE_LOG("WebRTC PeerConnection description: %s", descriptionToString(description.type()));
+            //WRITE_LOG("WebRTC PeerConnection description: %s", descriptionToString(description.type()));
         });
         //// PC State回调
         m_peerConnection->onStateChange([this](rtc::PeerConnection::State state) {
@@ -134,6 +141,20 @@ void WebRTCPublisher::initializePeerConnection() {
                     stopPublishing();
                 }
         });
+
+        //m_peerConnection->onLocalDescription([this](const rtc::Description& description) {
+        //    std::string sdp = std::string(description);
+
+        //    // 手动清理和简化SDP
+        //    sdp = cleanupSdp(sdp);
+
+        //    WRITE_LOG("Cleaned SDP Offer:\n%s", sdp.c_str());
+
+        //    // 使用清理后的SDP
+        //    QMetaObject::invokeMethod(this, [this, sdp]() {
+        //        sendOfferToSignalingServer(sdp);
+        //        }, Qt::QueuedConnection);
+        //    });
         /// ICE State回调
         m_peerConnection->onGatheringStateChange([this](rtc::PeerConnection::GatheringState state) {
             auto stateToString = [](rtc::PeerConnection::GatheringState s) {
@@ -174,13 +195,40 @@ void WebRTCPublisher::initializePeerConnection() {
             };
             WRITE_LOG("Signaling state changed: %s", stateToString(state));
         });
+        //完成回调后添加offer，防止竞态
+        m_peerConnection->setLocalDescription();
     } catch (const std::exception &e) {
         QString error = QString("Failed to create PeerConnection: %1").arg(e.what());
         WRITE_LOG(error.toStdString().c_str());
         emit errorOccurred(error);
     }
 }
-
+//// SDP清理函数
+//std::string WebRTCPublisher::cleanupSdp(const std::string& originalSdp) {
+//    std::stringstream ss(originalSdp); // 使用 istringstream
+//    std::string line;
+//    std::string cleanedSdp;
+//
+//    //while (std::getline(ss, line)) {
+//    //    // 移除可能有问题行
+//    //    if (line.find("a=group:LS") != std::string::npos) {
+//    //        continue; // 跳过LS组
+//    //    }
+//    //    if (line.find("a=ice-options:ice2") != std::string::npos) {
+//    //        continue; // 跳过ice2选项
+//    //    }
+//    //    // 简化opus配置
+//    //    if (line.find("fmtp:111") != std::string::npos) {
+//    //        cleanedSdp += "a=fmtp:111 minptime=10;useinbandfec=1\r\n";
+//    //        continue;
+//    //    }
+//    //    // 保留其他行
+//    //    cleanedSdp += line;
+//    //}
+//    cleanedSdp =
+//    
+//    return cleanedSdp;
+//}
 void WebRTCPublisher::startPublishing() {
     if (m_isPublishing) {
         WRITE_LOG("WebRTC publisher is already running.");
@@ -222,93 +270,112 @@ void WebRTCPublisher::sendOfferToSignalingServer(const std::string &sdp) {
 
     WRITE_LOG("Sending Offer SDP to %s", m_signalingUrl.toStdString().c_str());
     QNetworkReply *response = nullptr;
-    if (m_networkManager) {
-        WRITE_LOG("NetworkManager exists, attempting POST request...");
-        response = m_networkManager->post(request, body);
-        if (response) {
-            WRITE_LOG("POST request initiated successfully.");
-        }
-        else {
-            WRITE_LOG("ERROR: POST request initiation failed (reply is null).");
-            emit errorOccurred("Failed to create network reply object.");
-            return;
-        }
-    } else {
+    if (!m_networkManager) {
         WRITE_LOG("ERROR: m_networkManager is null when sending offer.");
         emit errorOccurred("Network manager not initialized.");
         return;
     }
 
+    WRITE_LOG("NetworkManager exists, attempting POST request...");
+    response = m_networkManager->post(request, body);
     if (!response) {
         WRITE_LOG("ERROR: Failed to send POST request to signaling server (reply is null).");
         emit errorOccurred("Failed to send offer to signaling server.");
         return;
     }
 
-    // Log that the request object was created
     WRITE_LOG("POST request sent to signaling server.");
 
-    // Per-reply error logging
-#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
     connect(response, &QNetworkReply::errorOccurred, this, [response, this](QNetworkReply::NetworkError code) {
         QString error = QString("Signaling reply network error occurred: %1 (Code: %2)").arg(response->errorString()).arg(code);
         WRITE_LOG(error.toStdString().c_str());
     });
-#else
-    connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onSignalingReply(nullptr)));
-#endif
 
-    // Safety: timeout the request if no response within10s
-    QTimer::singleShot(10000, response, [response]() {
-        if (!response->isFinished()) {
-            WRITE_LOG("Signaling request timeout, aborting reply.");
+
+    QTimer * timeoutTimer = new QTimer(this);
+    timeoutTimer->setSingleShot(true);
+    connect(timeoutTimer, &QTimer::timeout, this, [response, timeoutTimer, this]() {
+        if (response && !response->isFinished()) {
+            WRITE_LOG("Signaling request timeout (10s), aborting reply.");
             response->abort();
         }
-    });
+        timeoutTimer->deleteLater();
+        });
+    timeoutTimer->start(10000);
 
-    connect(response, &QNetworkReply::finished, this, [this, response]() {
+
+    connect(response, &QNetworkReply::finished, this, [this, response, timeoutTimer]() {
+        if (timeoutTimer && timeoutTimer->isActive()) {
+            timeoutTimer->stop();
+            timeoutTimer->deleteLater();
+        }
         WRITE_LOG("QNetworkReply finished signal received.");
         onSignalingReply(response);
-     });
+        });
+
     WRITE_LOG("Connections for reply signals established.");
 }
 
 void WebRTCPublisher::onSignalingReply(QNetworkReply *response) {
     WRITE_LOG("onSignalingReply called!");
-    if (response->error() == QNetworkReply::NoError) {
-        QByteArray response_data = response->readAll();
-        WRITE_LOG("Received response from signaling server: %s", response_data.constData());
+    if (!response) {
+        WRITE_LOG("ERROR: Response is null in onSignalingReply");
+        emit errorOccurred("Null response received");
+        return;
+    }
+	//检查网络错误
+    if (response->error() != QNetworkReply::NoError) {
+        QString error = QString("Network error: %1 (HTTP: %2)")
+            .arg(response->errorString())
+            .arg(response->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
+        WRITE_LOG(error.toStdString().c_str());
+        response->deleteLater();
+        emit errorOccurred(error);
+        return;
+    }
+	//读取响应数据
+    QByteArray response_data = response->readAll();
+    WRITE_LOG("Received response from signaling server, size: %d bytes", response_data.size());
+    WRITE_LOG("Response content: %s", response_data.constData());
+	//解析JSON
+    QJsonParseError parseError;
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(response_data, &parseError);
+    if (parseError.error != QJsonParseError::NoError) {
+        QString error = QString("Failed to parse JSON response: %1").arg(parseError.errorString());
+        WRITE_LOG(error.toStdString().c_str());
+        response->deleteLater();
+        emit errorOccurred(error);
+        return;
+    }
 
-        QJsonDocument jsonDoc = QJsonDocument::fromJson(response_data);
-        QJsonObject jsonObj = jsonDoc.object();
+    QJsonObject jsonObj = jsonDoc.object();
+    if (jsonObj.contains("code") && jsonObj["code"].toInt() == 0 && jsonObj.contains("sdp")) {
+        std::string sdpAnswer = jsonObj["sdp"].toString().toStdString();
+        WRITE_LOG("Successfully received Answer SDP from server, length: %d", sdpAnswer.length());
+        WRITE_LOG("Remote SDP Answer:\n%s", sdpAnswer.c_str());
 
-        if (jsonObj.contains("code") && jsonObj["code"].toInt() ==0 && jsonObj.contains("sdp")) {
-            std::string sdpAnswer = jsonObj["sdp"].toString().toStdString();
-            WRITE_LOG("Received Answer SDP from server.");
-
-            // ---设置远端 SDP 描述 ---
-            try {
-                if (m_peerConnection) {
-                    m_peerConnection->setRemoteDescription(rtc::Description(sdpAnswer, "answer"));
-                    WRITE_LOG("Remote description:\n%s", sdpAnswer.c_str());
-                } else {
-                    WRITE_LOG("Error: PeerConnection is null when trying to set remote description.");
-                }
-            } catch (const std::exception &e) {
-                QString error = QString("Failed to set remote description: %1").arg(e.what());
-                WRITE_LOG(error.toStdString().c_str());
-                emit errorOccurred(error);
+        // 设置远端SDP描述
+        try {
+            if (m_peerConnection) {
+                m_peerConnection->setRemoteDescription(rtc::Description(sdpAnswer, "answer"));
+                WRITE_LOG("Remote description set successfully.");
             }
-        } else {
-            QString error = QString("Signaling server returned an error or invalid data: %1").arg(
-            QString(response_data));
+            else {
+                WRITE_LOG("ERROR: PeerConnection is null when trying to set remote description.");
+                emit errorOccurred("PeerConnection is null");
+            }
+        }
+        catch (const std::exception& e) {
+            QString error = QString("Failed to set remote description: %1").arg(e.what());
             WRITE_LOG(error.toStdString().c_str());
             emit errorOccurred(error);
         }
-    } else {
-        QString error = QString("Signaling request failed: %1 (HTTP Status: %2)")
-                .arg(response->errorString())
-                .arg(response->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
+    }
+    else {
+        // 处理错误响应
+        QString errorMsg = jsonObj.contains("message") ? jsonObj["message"].toString() : "Unknown error";
+        int errorCode = jsonObj.contains("code") ? jsonObj["code"].toInt() : -1;
+        QString error = QString("Signaling server returned error: %1 (Code: %2)").arg(errorMsg).arg(errorCode);
         WRITE_LOG(error.toStdString().c_str());
         emit errorOccurred(error);
     }

@@ -20,7 +20,7 @@ ffmpegAudioDecoder::~ffmpegAudioDecoder() {
 bool ffmpegAudioDecoder::init(AVCodecParameters *params) {
     if (!params) {
         WRITE_LOG("Audio codec not found");
-        return false;
+		return false;
     }
     m_codec = avcodec_find_decoder(params->codec_id);
     if (!m_codec) {
@@ -28,7 +28,7 @@ bool ffmpegAudioDecoder::init(AVCodecParameters *params) {
     }
     m_codecCtx = avcodec_alloc_context3(m_codec);
     if (avcodec_parameters_to_context(m_codecCtx, params) < 0) {
-        WRITE_LOG("avcodec_parameters_to_context failed");
+        WRITE_LOG("avcodec_parameters_to_context failed");  
         return false;
     }
     if (avcodec_open2(m_codecCtx, m_codec, nullptr) < 0) {

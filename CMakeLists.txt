@@ -33,7 +33,7 @@ add_executable(CloudMeeting
         src/RtmpPublisher.cpp
         src/screen.cpp
         src/VideoWidget.cpp
-        src/WebRTCPublisher.cpp
+        "src/WebRTCPublisher.cpp"
 
         include/AudioResampleConfig.h
         include/Capture.h

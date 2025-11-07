@@ -17,24 +17,29 @@ RtmpPublisher::~RtmpPublisher() {
 }
 
 bool RtmpPublisher::init(const QString &rtmpUrl, AVCodecContext *vCodecCtx, AVCodecContext *aCodecCtx) {
+    avformat_network_init();
     if (m_outputFmtCtx) {
+		WRITE_LOG("Publisher already initialized. Clearing previous state.");
         clear();
+		return false;
     }
     if (!vCodecCtx && !aCodecCtx) {
         WRITE_LOG("No codec parameters provided.");
+        clear();
         return false;
     }
 
     int ret = avformat_alloc_output_context2(&m_outputFmtCtx, nullptr, "flv", rtmpUrl.toStdString().c_str());
     if (ret < 0 || !m_outputFmtCtx) {
         WRITE_LOG("Failed to allocate output context.");
+		clear();
         return false;
     }
 
     if (vCodecCtx) {
         m_videoStream = avformat_new_stream(m_outputFmtCtx, nullptr);
         if (!m_videoStream) {
-            WRITE_LOG("PUBLISHER ERROR:Fail to create videoStream");
+            WRITE_LOG("Fail to create videoStream");
             clear();
             return false;
         }
@@ -60,6 +65,7 @@ bool RtmpPublisher::init(const QString &rtmpUrl, AVCodecContext *vCodecCtx, AVCo
             char errbuf[1024] = {0};
             av_strerror(ret, errbuf, sizeof(errbuf));
             emit errorOccurred(QString("Publisher Error: Failed to open RTMP URL: %1").arg(errbuf));
+			WRITE_LOG("Failed to open RTMP URL: %s", errbuf);
             clear();
             return false;
         }
@@ -72,6 +78,7 @@ bool RtmpPublisher::init(const QString &rtmpUrl, AVCodecContext *vCodecCtx, AVCo
         char errbuf[1024] = {0};
         av_strerror(ret, errbuf, sizeof(errbuf));
         emit errorOccurred(QString("Publisher Error: Fail to write RTMP header: %1").arg(errbuf));
+		WRITE_LOG("Failed to write RTMP header: %s", errbuf);
         clear();
         return false;
     }
@@ -87,7 +94,7 @@ void RtmpPublisher::startPublishing() {
     }
     m_isPublishing = true;
     emit publisherStarted();
-    // [修改] 使用事件调用启动推流
+    // 使用事件调用启动推流
     QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
     WRITE_LOG("RTMP publishing process started...");
 }

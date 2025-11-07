@@ -61,7 +61,7 @@ private:
     QUEUE_DATA<AVFramePtr> *m_audioFrameQueue; //网络传输帧队列
 
     // --- 推流 ---
-    WebRTCPublisher *m_webRTCPublisher; //WebRTC
+    //WebRTCPublisher *m_webRTCPublisher; //WebRTC
     RtmpPublisher *m_rtmpPublisher; //RTMP
     QUEUE_DATA<AVPacketPtr> *m_publishPacketQueue; //发送队列
 
@@ -72,7 +72,7 @@ private:
     QThread *m_videoEncoderThread;
     QThread *m_audioEncoderThread;
     QThread *m_rtmpPublisherThread;
-    QThread *m_webRTCPublisherThread;
+    //QThread *m_webRTCPublisherThread;
 
     VideoWidget *m_videoWidget;
 
