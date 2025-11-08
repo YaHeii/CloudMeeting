@@ -182,7 +182,7 @@ void ffmpegVideoDecoder::doDecodingPacket() {
 
              //通知UI线程有新帧可用
             emit newFrameAvailable();
-            WRITE_LOG("NewFrameAvailable");
+            //WRITE_LOG("NewFrameAvailable");
         }
         av_frame_unref(decodedFrame.get());
     }

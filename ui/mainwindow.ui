@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
@@ -14,13 +14,13 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_2">
+   <layout class="QVBoxLayout" name="verticalLayout_2" stretch="1,6,1,2">
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout" stretch="1,1,1,1">
       <item>
        <widget class="QGroupBox" name="groupBox">
         <property name="title">
-         <string>加入会议</string>
+         <string>加入房间</string>
         </property>
         <property name="flat">
          <bool>false</bool>
@@ -67,7 +67,7 @@
       <item>
        <widget class="QGroupBox" name="groupBox_2">
         <property name="title">
-         <string>创建会议</string>
+         <string>创建房间</string>
         </property>
         <property name="flat">
          <bool>false</bool>
@@ -83,13 +83,20 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QPushButton" name="LiveStreamingBtn">
+           <property name="text">
+            <string>创建直播</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </widget>
       </item>
       <item>
        <widget class="QGroupBox" name="groupBox_3">
         <property name="title">
-         <string>退出会议</string>
+         <string>退出房间</string>
         </property>
         <property name="flat">
          <bool>false</bool>
@@ -159,40 +166,16 @@
         <property name="currentIndex">
          <number>0</number>
         </property>
-        <widget class="QWidget" name="tab">
-         <attribute name="title">
-          <string>副屏幕</string>
-         </attribute>
-         <layout class="QVBoxLayout" name="verticalLayout_4">
-          <item>
-           <widget class="QScrollArea" name="scrollArea">
-            <property name="widgetResizable">
-             <bool>true</bool>
-            </property>
-            <widget class="QWidget" name="scrollAreaWidgetContents">
-             <property name="geometry">
-              <rect>
-               <x>0</x>
-               <y>0</y>
-               <width>314</width>
-               <height>674</height>
-              </rect>
-             </property>
-            </widget>
-           </widget>
-          </item>
-         </layout>
-        </widget>
         <widget class="QWidget" name="tab_2">
          <attribute name="title">
           <string>聊天窗口</string>
          </attribute>
          <layout class="QVBoxLayout" name="verticalLayout_5">
           <item>
-           <widget class="QListWidget" name="listWidget"/>
-          </item>
-          <item>
-           <layout class="QVBoxLayout" name="widget" stretch="1,0">
+           <layout class="QVBoxLayout" name="widget" stretch="1,2,1">
+            <item>
+             <widget class="VideoWidget" name="smallVideoDisplayWidget" native="true"/>
+            </item>
             <item>
              <widget class="MyTextEdit" name="plainTextEdit" native="true"/>
             </item>
@@ -216,7 +199,7 @@
         </property>
         <layout class="QGridLayout" name="gridLayout">
          <item row="0" column="0">
-          <widget class="VideoWidget" name="videoDisplayWidget" native="true"/>
+          <widget class="VideoWidget" name="mainVideoDisplayWidget" native="true"/>
          </item>
         </layout>
        </widget>

@@ -27,7 +27,7 @@ MainWindow::MainWindow(QWidget *parent)
     Screen::init();
     MainWindow::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
 
-    m_videoWidget = ui->videoDisplayWidget;
+    m_videoWidget = ui->smallVideoDisplayWidget;
 
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui->openVideo->setText(QString(OPENVIDEO).toUtf8());
@@ -249,9 +249,11 @@ void MainWindow::on_createmeetBtn_clicked() {
     connect(m_videoEncoder, &ffmpegEncoder::initializationSuccess, this, &MainWindow::videoEncoderReady);
     if (m_isAudioRunning || m_isVideoRunning) {
         ui->createmeetBtn->setEnabled(true);
-        QString rtmpUrl = ui->meetnum->text();
-        WRITE_LOG("Joining meeting %s", rtmpUrl);
-		qDebug() << "Joining meeting in " <<rtmpUrl;
+        //QString rtmpUrl = ui->meetnum->text();
+        QString rtmpUrl = "rtmp://127.0.0.1:1935/live/teststream";
+        //QString rtmpTest = "rtmp://rtmp://127.0.0.1:1935/live/teststream";
+        WRITE_LOG("Joining meeting", rtmpUrl);
+		qDebug() << "Joining meeting in " << rtmpUrl;
 
         AVCodecContext *videoCtx = m_videoEncoder->getCodecContext();
         AVCodecContext *audioCtx = m_audioEncoder->getCodecContext();
