@@ -17,13 +17,14 @@ ffmpegAudioDecoder::~ffmpegAudioDecoder() {
     clear();
 }
 
-bool ffmpegAudioDecoder::init(AVCodecParameters *params) {
+bool ffmpegAudioDecoder::init(AVCodecParameters *params, AVRational inputTimeBase) {
     if (!params) {
         WRITE_LOG("Audio codec not found");
 		return false;
     }
     m_codec = avcodec_find_decoder(params->codec_id);
     if (!m_codec) {
+		WRITE_LOG("decodeCapture failed for codec id: %d", params->codec_id);
         return false;
     }
     m_codecCtx = avcodec_alloc_context3(m_codec);
@@ -35,32 +36,11 @@ bool ffmpegAudioDecoder::init(AVCodecParameters *params) {
         WRITE_LOG("avcodec_open2 failed");
         return false;
     }
-
+    
     WRITE_LOG("Audio Decoder initialized successfully.");
     return true;
-}
+	m_inputTimeBase = inputTimeBase;
 
-void ffmpegAudioDecoder::clear() {
-    stopDecoding(); {
-        QMutexLocker locker(&m_workMutex);
-        while (m_isDoingWork) {
-            m_workCond.wait(&m_workMutex);
-        }
-    }
-
-    if (m_codecCtx) {
-        avcodec_free_context(&m_codecCtx);
-        m_codecCtx = nullptr;
-    }
-    if (m_swrCtx) {
-        swr_free(&m_swrCtx);
-        m_swrCtx = nullptr;
-    }
-    if (m_fifo) {
-        av_audio_fifo_free(m_fifo);
-        m_fifo = nullptr;
-    }
-    WRITE_LOG("Audio decoder cleared successfully.");
 }
 
 void ffmpegAudioDecoder::setResampleConfig(const AudioResampleConfig &config) {
@@ -133,7 +113,7 @@ void ffmpegAudioDecoder::doDecodingPacket() {
         }
         return;
     }
-    // 工作开始
+
     {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = true;
@@ -159,7 +139,7 @@ void ffmpegAudioDecoder::doDecodingPacket() {
             resampledFrame->sample_rate = m_ResampleConfig.sample_rate;
             resampledFrame->format = m_ResampleConfig.sample_fmt;
 
-            // --- 计算PTS ---
+            // 设置BasePts
             //如果FIFO是空的，那么这个解码帧是音频流的起始帧，那么设置PTS为后续基准PTS
             if (m_fifoBasePts == AV_NOPTS_VALUE && decoded_frame->pts != AV_NOPTS_VALUE) {
                 if (av_audio_fifo_size(m_fifo) == 0) {
@@ -175,7 +155,7 @@ void ffmpegAudioDecoder::doDecodingPacket() {
             // --- 读取固定帧 ---
             while (av_audio_fifo_size(m_fifo) >= m_ResampleConfig.frame_size) {
                 AVFramePtr sendFrame(av_frame_alloc());
-
+                sendFrame->pts = m_fifoBasePts;
                 // 设置帧参数
                 sendFrame->nb_samples = m_ResampleConfig.frame_size;
                 sendFrame->ch_layout = m_ResampleConfig.ch_layout;
@@ -187,21 +167,43 @@ void ffmpegAudioDecoder::doDecodingPacket() {
                 av_audio_fifo_read(m_fifo, (void **) sendFrame->data, m_ResampleConfig.frame_size);
 
                 // --- 计算PTS ---
-                if (m_fifoBasePts != AV_NOPTS_VALUE) {
-                    sendFrame->pts = m_fifoBasePts;
-                    m_fifoBasePts += sendFrame->nb_samples;
-                } else {
-                    sendFrame->pts = AV_NOPTS_VALUE;
-                }
+                int64_t duration = av_rescale_q(sendFrame->nb_samples,
+                    { 1, m_ResampleConfig.sample_rate },
+                    m_inputTimeBase);
+                m_fifoBasePts += duration;
                 // --- 入队给编码器 ---
                 m_frameQueue->enqueue(std::move(sendFrame));
             }
         }
     }
-    work_guard(); // 工作结束
+    work_guard();
 
-    // [修改] 调度下一次执行
     if (m_isDecoding) {
         QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
     }
+
+}
+
+void ffmpegAudioDecoder::clear() {
+    stopDecoding();
+    {
+        QMutexLocker locker(&m_workMutex);
+        while (m_isDoingWork) {
+            m_workCond.wait(&m_workMutex);
+        }
+    }
+
+    if (m_codecCtx) {
+        avcodec_free_context(&m_codecCtx);
+        m_codecCtx = nullptr;
+    }
+    if (m_swrCtx) {
+        swr_free(&m_swrCtx);
+        m_swrCtx = nullptr;
+    }
+    if (m_fifo) {
+        av_audio_fifo_free(m_fifo);
+        m_fifo = nullptr;
+    }
+    WRITE_LOG("Audio decoder cleared successfully.");
 }

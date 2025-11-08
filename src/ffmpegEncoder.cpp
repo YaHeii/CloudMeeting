@@ -34,35 +34,38 @@ bool ffmpegEncoder::initAudioEncoderAAC(AVCodecParameters* aparams) {
         emit errorOccurred("Failed to allocate codec context.");
         return false;
     }
-    int sample_rate = 48000;
-    int nb_channels = 1;
+    int sample_rate =48000;
+    int nb_channels =1;
     if (aparams) {
-        if (aparams->sample_rate > 0) sample_rate = aparams->sample_rate;
-        if (aparams->ch_layout.nb_channels > 0) nb_channels = aparams->ch_layout.nb_channels;
+        if (aparams->sample_rate >0) sample_rate = aparams->sample_rate;
+        if (aparams->ch_layout.nb_channels >0) nb_channels = aparams->ch_layout.nb_channels;
     }
 
     m_codecCtx->sample_rate = sample_rate;
     av_channel_layout_default(&m_codecCtx->ch_layout, nb_channels);
     m_codecCtx->sample_fmt = AV_SAMPLE_FMT_FLTP;
-    m_codecCtx->bit_rate = 128000; //128 kbps
-    m_codecCtx->time_base = { 1, m_codecCtx->sample_rate };
+    m_codecCtx->bit_rate =128000; //128 kbps
+    m_codecCtx->time_base = {1, m_codecCtx->sample_rate };
 
     if (codec->id == AV_CODEC_ID_AAC) {
         // nothing additional required for native aac
     }
     else {
         // try to set some libfdk_aac options if used
-        if (av_opt_set(m_codecCtx->priv_data, "bitrate", "128000", 0) < 0) {
+        if (av_opt_set(m_codecCtx->priv_data, "bitrate", "128000",0) <0) {
         }
     }
 
     m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
-    if (avcodec_open2(m_codecCtx, codec, nullptr) < 0) {
+    if (avcodec_open2(m_codecCtx, codec, nullptr) <0) {
         emit errorOccurred("Failed to open audio codec.");
         avcodec_free_context(&m_codecCtx);
         return false;
     }
+
+    // reset audio samples counter
+    m_audioSamplesCount =0;
 
     AudioResampleConfig config;
     config.frame_size = m_codecCtx->frame_size;
@@ -139,18 +142,21 @@ bool ffmpegEncoder::initVideoEncoderH264(AVCodecParameters *vparams) {
     m_codecCtx->width = vparams->width;
     m_codecCtx->height = vparams->height;
     m_codecCtx->pix_fmt = AV_PIX_FMT_YUV420P; // H.264常用格式
-    m_codecCtx->time_base = {1, 25}; // 25 fps
-    m_codecCtx->framerate = {25, 1};
-    m_codecCtx->bit_rate = 2000000; // 2 Mbps
-    m_codecCtx->gop_size = 25;
-    m_codecCtx->max_b_frames = 1;
-    av_opt_set(m_codecCtx->priv_data, "preset", "ultrafast", 0);
-    av_opt_set(m_codecCtx->priv_data, "tune", "zerolatency", 0);
+    m_codecCtx->time_base = {1,25}; //25 fps
+    m_codecCtx->framerate = {25,1};
+    m_codecCtx->bit_rate =2000000; //2 Mbps
+    m_codecCtx->gop_size =25;
+    m_codecCtx->max_b_frames =1;
+    av_opt_set(m_codecCtx->priv_data, "preset", "ultrafast",0);
+    av_opt_set(m_codecCtx->priv_data, "tune", "zerolatency",0);
     m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // 全局头
-    if (avcodec_open2(m_codecCtx, codec, nullptr) < 0) {
+    if (avcodec_open2(m_codecCtx, codec, nullptr) <0) {
         emit errorOccurred("Failed to open video codec.");
         return false;
     }
+
+    // reset video frame counter
+    m_videoFrameCounter =0;
 
     emit encoderInitialized(m_codecCtx);
     emit initializationSuccess();
@@ -181,21 +187,29 @@ void ffmpegEncoder::doEncodingWork() { {
     };
     AVFramePtr frame;
     if (m_frameQueue->dequeue(frame)) {
+        // Assign PTS if missing and update internal counters
+        if (m_mediaType == AVMEDIA_TYPE_VIDEO) {          
+            frame->pts = m_videoFrameCounter++;
+        } else if (m_mediaType == AVMEDIA_TYPE_AUDIO) {
+            frame->pts = m_audioSamplesCount;
+            m_audioSamplesCount += frame->nb_samples;
+        }
+
         int ret = avcodec_send_frame(m_codecCtx, frame.get());
-        if (ret < 0) {
+        if (ret <0) {
             emit errorOccurred("Error sending frame to encoder.");
         } else {
-            while (ret >= 0) {
+            while (ret >=0) {
                 AVPacketPtr packet(av_packet_alloc());
                 ret = avcodec_receive_packet(m_codecCtx, packet.get());
-                //WRITE_LOG("Encoding");    ////判断编码循环是否正常时开启
+                //WRITE_LOG("Encoding"); ////判断编码循环是否正常时开启
                 if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {////数据空或编码结束
                     break;
-                } else if (ret < 0) {
+                } else if (ret <0) {
                     emit errorOccurred("Error receiving packet from encoder.");
                     break;
                 }
-                packet->stream_index = (m_mediaType == AVMEDIA_TYPE_VIDEO) ? 0 : 1;
+                packet->stream_index = (m_mediaType == AVMEDIA_TYPE_VIDEO) ?0 :1;
                 m_packetQueue->enqueue(std::move(packet));
             }
         }

@@ -45,6 +45,7 @@ private:
     AVAudioFifo *m_fifo = nullptr;
     AVCodecContext *m_encoderCtx = nullptr;
     int64_t m_fifoBasePts = AV_NOPTS_VALUE;
+	AVRational m_inputTimeBase;
     AudioResampleConfig m_ResampleConfig;
 
     // --- 线程同步 ---
@@ -56,7 +57,7 @@ private:
     // QAudioSink* m_audioSink = nullptr;
     // QIODevice* m_audioDevice = nullptr; // 音频输出设备
 public slots:
-    bool init(AVCodecParameters *params);
+    bool init(AVCodecParameters *params, AVRational inputTimeBase);
 
     void startDecoding();
 

@@ -56,13 +56,17 @@ private:
     int m_swsSrcHeight = 0;
     AVPixelFormat m_swsSrcPixFmt = AV_PIX_FMT_NONE;
 
+    // base pts for video frames (matches audio's m_fifoBasePts logic)
+    int64_t m_frameBasePts = AV_NOPTS_VALUE;
+	AVRational m_inputTimeBase;
+
 signals:
     void newFrameAvailable();
 
     void errorOccurred(const QString &errorText);
 
 public slots:
-    bool init(AVCodecParameters *params);
+    bool init(AVCodecParameters *params, AVRational inputTimeBase);
 
     void startDecoding();
 

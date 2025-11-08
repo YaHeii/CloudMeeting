@@ -6,6 +6,10 @@
 
 bool ffmpegInputInitialized = false;
 
+Capture::Capture(QObject* parent) : QObject(parent) {
+    initializeFFmpeg();
+}
+
 void Capture::initializeFFmpeg() {
     if (!ffmpegInputInitialized) {
         avdevice_register_all();
@@ -14,10 +18,9 @@ void Capture::initializeFFmpeg() {
     }
 }
 
-Capture::Capture(QObject *parent) : QObject(parent) {
-    initializeFFmpeg();
-}
-
+/// <summary>
+/// Capture 类的析构函数。在对象销毁时确保停止读取、关闭设备并写入日志。
+/// </summary>
 Capture::~Capture() {
     // 确保读取已停止
     stopReading();
@@ -43,8 +46,6 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
     QString deviceUrl;
     m_videoDeviceName = videoDeviceName;
     m_audioDeviceName = audioDeviceName;
-#ifdef Q_OS_WIN
-    // Windows 使用 dshow
     inputFormat = av_find_input_format("dshow");
     if (!videoDeviceName.isEmpty() && !audioDeviceName.isEmpty()) {
         deviceUrl = QString("video=%1:audio=%2").arg(videoDeviceName).arg(audioDeviceName);
@@ -61,23 +62,6 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
     // 可以设置一些dshow参数，例如视频尺寸、帧率等
     // av_dict_set(&options, "video_size", "640x480", 0);
     // av_dict_set(&options, "framerate", "30", 0);
-#elif defined(Q_OS_LINUX)
-    // Linux 使用 v4l2 (video) 和 alsa (audio)
-    // 注意：Linux下通常需要分开采集视频和音频
-    if (!videoDeviceName.isEmpty()) {
-        inputFormat = av_find_input_format("v4l2");
-        deviceUrl = videoDeviceName; // 例如 "/dev/video0"
-    } else if (!audioDeviceName.isEmpty()) {
-        inputFormat = av_find_input_format("alsa");
-        deviceUrl = audioDeviceName; // 例如 "hw:0"
-    } else {
-        emit errorOccurred("No device name provided for Linux.");
-        return;
-    }
-#else
-    emit errorOccurred("Unsupported operating system.");
-    return;
-#endif
     if (!inputFormat) {
         emit errorOccurred("No inputFormat provided.");
         return;
@@ -135,10 +119,17 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
     }
     vParams = (m_videoStreamIndex >= 0) ? m_FormatCtx->streams[m_videoStreamIndex]->codecpar : nullptr;
     aParams = (m_audioStreamIndex >= 0) ? m_FormatCtx->streams[m_audioStreamIndex]->codecpar : nullptr;
-    emit deviceOpenSuccessfully(vParams, aParams);
+    AVRational vTimeBase = (m_videoStreamIndex >= 0)
+        ? m_FormatCtx->streams[m_videoStreamIndex]->time_base
+        : AVRational{ 0, 1 };
+    AVRational aTimeBase = (m_audioStreamIndex >= 0)
+        ? m_FormatCtx->streams[m_audioStreamIndex]->time_base
+        : AVRational{ 0, 1 };
+    emit deviceOpenSuccessfully(vParams, aParams, vTimeBase, aTimeBase);
 }
 
 void Capture::openAudio(const QString &audioDeviceName) {
+	WRITE_LOG("Opening audio device:", audioDeviceName);
     if (m_isVideo) {
         openDevice(m_videoDeviceName, audioDeviceName);
     } else {
@@ -147,6 +138,7 @@ void Capture::openAudio(const QString &audioDeviceName) {
 }
 
 void Capture::openVideo(const QString &VideoDeviceName) {
+	WRITE_LOG("Opening video device:", VideoDeviceName);
     if (m_isAudio) {
         openDevice(VideoDeviceName, m_audioDeviceName);
     } else {
@@ -155,11 +147,13 @@ void Capture::openVideo(const QString &VideoDeviceName) {
 }
 
 void Capture::closeAudio() {
+	WRITE_LOG("Closing audio device.");
     closeDevice();
     openVideo(m_videoDeviceName);
 }
 
 void Capture::closeVideo() {
+	WRITE_LOG("Closing video device.");
     closeDevice();
     openAudio(m_audioDeviceName);
 }
@@ -171,9 +165,10 @@ void Capture::startReading() {
     }
 
     if (m_isReading) {
-        // 防止重复启动
+		WRITE_LOG("Already reading frames.");
         return;
     }
+
     WRITE_LOG("Starting to read frames...");
     m_isReading = true;
     m_startTime = av_gettime();
@@ -238,7 +233,7 @@ void Capture::doReadFrame() {
 
         // 将微秒单位的时间戳，转换为流的时间基单位
         packet->pts = av_rescale_q(pts_in_us, {1, 1000000}, time_base);
-        packet->dts = packet->pts; // 视频会议，DTS=PTS
+        packet->dts = packet->pts; 
     }
 
     if (packet->stream_index == m_videoStreamIndex) {

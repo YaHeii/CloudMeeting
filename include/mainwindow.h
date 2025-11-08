@@ -98,6 +98,6 @@ private slots:
 
     void handleError(const QString &errorText);
 
-    void onDeviceOpened(AVCodecParameters *vParams, AVCodecParameters *aParams);
+    void onDeviceOpened(AVCodecParameters* vParams, AVCodecParameters* aParams, AVRational vTimeBase, AVRational aTimeBase);
 };
 #endif // MAINWINDOW_H

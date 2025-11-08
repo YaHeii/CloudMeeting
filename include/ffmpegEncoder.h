@@ -41,6 +41,10 @@ private:
     AVCodecContext *m_codecCtx = nullptr;
     AVMediaType m_mediaType;
 
+    // Keep counters for assigning PTS in encoder time_base
+    int64_t m_videoFrameCounter =0;
+    int64_t m_audioSamplesCount =0;
+
     // --- 用于线程同步 ---
     QMutex m_workMutex;
     QWaitCondition m_workCond;

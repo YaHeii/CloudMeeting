@@ -45,6 +45,8 @@ bool RtmpPublisher::init(const QString &rtmpUrl, AVCodecContext *vCodecCtx, AVCo
         }
         avcodec_parameters_from_context(m_videoStream->codecpar, vCodecCtx);
         m_videoStream->codecpar->codec_tag = 0;
+        // Ensure stream time_base is set from encoder context so muxer/interleaving work correctly
+        //m_videoStream->time_base = vCodecCtx->time_base;
         m_videoEncoderTimeBase = vCodecCtx->time_base; //设置编码器时间基
     }
     if (aCodecCtx) {
@@ -56,6 +58,8 @@ bool RtmpPublisher::init(const QString &rtmpUrl, AVCodecContext *vCodecCtx, AVCo
         }
         avcodec_parameters_from_context(m_audioStream->codecpar, aCodecCtx);
         m_audioStream->codecpar->codec_tag = 0;
+        // Set audio stream time_base from encoder
+        //m_audioStream->time_base = aCodecCtx->time_base;
         m_audioEncoderTimeBase = aCodecCtx->time_base;
     }
     // --- 打开IO ---
@@ -77,12 +81,21 @@ bool RtmpPublisher::init(const QString &rtmpUrl, AVCodecContext *vCodecCtx, AVCo
     if (ret < 0) {
         char errbuf[1024] = {0};
         av_strerror(ret, errbuf, sizeof(errbuf));
-        emit errorOccurred(QString("Publisher Error: Fail to write RTMP header: %1").arg(errbuf));
-		WRITE_LOG("Failed to write RTMP header: %s", errbuf);
+        emit errorOccurred(QString("Publisher Error: Fail to write RTMP header: %1 (ret=%2)").arg(errbuf).arg(ret));
+		WRITE_LOG("Failed to write RTMP header: %s (ret=%d)", errbuf, ret);
         clear();
         return false;
     }
-
+    if (m_videoStream) {
+        WRITE_LOG("Video stream time_base: %d/%d (encoder: %d/%d)",
+            m_videoStream->time_base.num, m_videoStream->time_base.den,
+            m_videoEncoderTimeBase.num, m_videoEncoderTimeBase.den);
+    }
+    if (m_audioStream) {
+        WRITE_LOG("Audio stream time_base: %d/%d (encoder: %d/%d)",
+            m_audioStream->time_base.num, m_audioStream->time_base.den,
+            m_audioEncoderTimeBase.num, m_audioEncoderTimeBase.den);
+    }
     WRITE_LOG("RTMP publisher initialized. Connected to %s", rtmpUrl.toStdString().c_str());
     return true;
 }
@@ -162,7 +175,7 @@ void RtmpPublisher::doPublishingWork() {
         return;
     }
 
-    // --- 核心：时间基转换 ---
+    // --- 时间基转换 ---
     // 将packet的PTS/DTS从编码器的时间基(source_time_base)转换到输出流的时间基(dest_stream->time_base)
     av_packet_rescale_ts(packet.get(), source_time_base, dest_stream->time_base);
     packet->pos = -1;

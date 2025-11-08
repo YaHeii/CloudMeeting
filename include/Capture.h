@@ -59,7 +59,7 @@ private:
     std::atomic<bool> m_isDoingWork = false;
 
 signals:
-    void deviceOpenSuccessfully(AVCodecParameters *vparams, AVCodecParameters *aparams);
+    void deviceOpenSuccessfully(AVCodecParameters *vparams, AVCodecParameters *aparams, AVRational vTimeBase, AVRational aTimeBase);
 
     void errorOccurred(const QString &errorText);
 

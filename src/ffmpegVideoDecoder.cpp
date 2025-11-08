@@ -17,13 +17,13 @@ ffmpegVideoDecoder::~ffmpegVideoDecoder() {
     clear();
 }
 
-bool ffmpegVideoDecoder::init(AVCodecParameters *params) {
+bool ffmpegVideoDecoder::init(AVCodecParameters *params, AVRational inputTimeBase) {
     if (!params) {
         return false;
     }
     m_codec = avcodec_find_decoder(params->codec_id);
     if (!m_codec) {
-        WRITE_LOG("codec未解析");
+        WRITE_LOG("decodeCapture failed for codec id: %d", params->codec_id);
         return false;
     }
     m_codecCtx = avcodec_alloc_context3(m_codec);
@@ -41,8 +41,13 @@ bool ffmpegVideoDecoder::init(AVCodecParameters *params) {
         avcodec_free_context(&m_codecCtx);
         return false;
     }
+    // reset base pts
+    m_frameBasePts = AV_NOPTS_VALUE;
+
     WRITE_LOG("Video decoder initialized successfully.");
     return true;
+
+	m_inputTimeBase = inputTimeBase;
 }
 
 void ffmpegVideoDecoder::startDecoding() {
@@ -51,6 +56,7 @@ void ffmpegVideoDecoder::startDecoding() {
         return;
     }
     if (m_isDecoding) {
+        WRITE_LOG("Decoding already in progress.");
         return; // 防止重复启动
     }
     WRITE_LOG("Starting video decoding loop...");
@@ -69,8 +75,6 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         WRITE_LOG("Video decoding loop finished.");
         return;
     }
-    WRITE_LOG("ffmpegDecoder::startDecoding");
-
     AVPacketPtr packet;
     if (!m_packetQueue->dequeue(packet)) {
         if (m_isDecoding) {
@@ -78,7 +82,8 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         }
         WRITE_LOG("ffmpegDecoder::Deque Packet TimeOut");
         return;
-    } {
+    } 
+    {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = true;
     }
@@ -87,6 +92,7 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         m_isDoingWork = false;
         m_workCond.wakeAll(); // 唤醒可能在clear()中等待的线程
     };
+
     AVFramePtr decodedFrame(av_frame_alloc());
     if (!decodedFrame) {
         WRITE_LOG("Failed to allocate decoded_frame.");
@@ -100,27 +106,44 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         }
         return;
     }
-	WRITE_LOG("Packet sent to decoder.");
     while (m_isDecoding) {
         int ret = avcodec_receive_frame(m_codecCtx, decodedFrame.get());
+
         if (ret < 0) {
-            // EAGAIN 或 EOF 表示这个包已经处理完了，可以跳出内层循环
+             //EAGAIN 或 EOF 表示这个包已经处理完了，可以跳出内层循环
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
                 break;
             }
             WRITE_LOG("avcodec_receive_frame failed.");
             break;
         }
-        AVFramePtr frame_for_encoder(av_frame_clone(decodedFrame.get()));
-        if (frame_for_encoder) {
-            m_frameQueue->enqueue(std::move(frame_for_encoder));
+
+        if (m_frameBasePts == AV_NOPTS_VALUE && decodedFrame->pts != AV_NOPTS_VALUE) {
+            m_frameBasePts = decodedFrame->pts;
         }
+
+        AVFramePtr sendFrame(av_frame_clone(decodedFrame.get()));
+        if (decodedFrame->pts != AV_NOPTS_VALUE) {
+             //将输入PTS转换为帧序号（假设编码器用帧序号）
+            int64_t pts_in_frames = av_rescale_q(
+                decodedFrame->pts - m_frameBasePts,
+                m_inputTimeBase,
+                { 1, 25 }  // 假设25fps
+            );
+            sendFrame->pts = pts_in_frames;
+        }
+        else {
+            sendFrame->pts = AV_NOPTS_VALUE;
+        }
+
+            m_frameQueue->enqueue(std::move(sendFrame));
+
         bool formatChanged = (m_swsSrcWidth != m_codecCtx->width ||
                               m_swsSrcHeight != m_codecCtx->height ||
                               m_swsSrcPixFmt != m_codecCtx->pix_fmt);
         if (!m_swsCtx || formatChanged) {
             WRITE_LOG("Re-initializing SwsContext due to format change.");
-            // 释放旧资源
+            //释放旧资源
             sws_freeContext(m_swsCtx);
             av_free(rgbBuffer);
             rgbBuffer = nullptr;
@@ -135,10 +158,10 @@ void ffmpegVideoDecoder::doDecodingPacket() {
                                       SWS_BILINEAR, nullptr, nullptr, nullptr);
 
             if (m_swsCtx) {
-                int bufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, m_swsSrcWidth, m_swsSrcHeight, 1);
+                int bufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, m_swsSrcWidth, m_swsSrcHeight,1);
                 rgbBuffer = (uint8_t *) av_malloc(bufferSize * sizeof(uint8_t));
                 av_image_fill_arrays(m_rgbFrame->data, m_rgbFrame->linesize, rgbBuffer, AV_PIX_FMT_RGB24,
-                                     m_swsSrcWidth, m_swsSrcHeight, 1);
+                                     m_swsSrcWidth, m_swsSrcHeight,1);
             } else {
                 WRITE_LOG("FATAL: Failed to create SwsContext.");
                 // 如果SwsContext创建失败，后续的转换也无法进行，可以跳出循环
@@ -157,9 +180,9 @@ void ffmpegVideoDecoder::doDecodingPacket() {
             auto image = std::make_unique<QImage>(tempImage.copy()); //copy做深拷贝
             m_QimageQueue->enqueue(std::move(image)); //添加到图片队列，用于QT渲染
 
-            // 通知UI线程有新帧可用
+             //通知UI线程有新帧可用
             emit newFrameAvailable();
-            // WRITE_LOG("NewFrameAvailable");
+            WRITE_LOG("NewFrameAvailable");
         }
         av_frame_unref(decodedFrame.get());
     }
@@ -171,8 +194,10 @@ void ffmpegVideoDecoder::doDecodingPacket() {
     }
 }
 
+
 void ffmpegVideoDecoder::clear() {
-    stopDecoding(); {
+    stopDecoding(); 
+    {
         QMutexLocker locker(&m_workMutex);
         // 如果doDecodingPacket的核心部分正在执行，则等待它完成
         while (m_isDoingWork) {

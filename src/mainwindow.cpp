@@ -42,10 +42,11 @@ MainWindow::MainWindow(QWidget *parent)
     ui->openAudio->setDisabled(false);
     ui->openVideo->setDisabled(false);
     ui->sendmsg->setDisabled(false);
+    ui->meetnum->setPlaceholderText("rtmp://127.0.0.1:1935/live/teststream");
     mainip = 0; //主屏幕显示的用户IP图像
 
     // 初始化队列
-    m_videoPacketQueue = new QUEUE_DATA<AVPacketPtr>();
+	m_videoPacketQueue = new QUEUE_DATA<AVPacketPtr>();//采集到的视频包队列
     m_QimageQueue = new QUEUE_DATA<std::unique_ptr<QImage> >();
     m_videoFrameQueue = new QUEUE_DATA<AVFramePtr>();
     m_audioPacketQueue = new QUEUE_DATA<AVPacketPtr>();
@@ -248,9 +249,9 @@ void MainWindow::on_createmeetBtn_clicked() {
     connect(m_videoEncoder, &ffmpegEncoder::initializationSuccess, this, &MainWindow::videoEncoderReady);
     if (m_isAudioRunning || m_isVideoRunning) {
         ui->createmeetBtn->setEnabled(true);
-        QString rtmpUrl = "rtmp://127.0.0.1:1935/live/teststream";
-        WRITE_LOG("Joining meeting...");
-		qDebug() << "Joining meeting...";
+        QString rtmpUrl = ui->meetnum->text();
+        WRITE_LOG("Joining meeting %s", rtmpUrl);
+		qDebug() << "Joining meeting in " <<rtmpUrl;
 
         AVCodecContext *videoCtx = m_videoEncoder->getCodecContext();
         AVCodecContext *audioCtx = m_audioEncoder->getCodecContext();
@@ -302,11 +303,12 @@ void MainWindow::on_exitmeetBtn_clicked() {
 }
 
 
-void MainWindow::onDeviceOpened(AVCodecParameters *vParams, AVCodecParameters *aParams) {
+void MainWindow::onDeviceOpened(AVCodecParameters *vParams, AVCodecParameters *aParams, AVRational vTimeBase, AVRational aTimeBase) {
     WRITE_LOG("Main thread: Device opened. Initializing...");
     if (vParams) {
         qDebug("Initializing video pipeline");
-        QMetaObject::invokeMethod(m_videoDecoder, "init", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, vParams));
+        QMetaObject::invokeMethod(m_videoDecoder, "init", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, vParams),
+                                  Q_ARG(AVRational, vTimeBase));
         QMetaObject::invokeMethod(m_videoEncoder, "initVideoEncoderH264", Qt::QueuedConnection,
                                   Q_ARG(AVCodecParameters*, vParams));
         QMetaObject::invokeMethod(m_videoDecoder, "startDecoding", Qt::QueuedConnection);
@@ -315,7 +317,8 @@ void MainWindow::onDeviceOpened(AVCodecParameters *vParams, AVCodecParameters *a
     if (aParams) {
         // 只需要初始化，startDecoding/Encoding 会在配置完成后自动处理
         qDebug("Initializing audio pipeline");
-        QMetaObject::invokeMethod(m_audioDecoder, "init", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, aParams));
+        QMetaObject::invokeMethod(m_audioDecoder, "init", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, aParams),
+                                 Q_ARG(AVRational, aTimeBase));
         QMetaObject::invokeMethod(m_audioEncoder, "initAudioEncoderAAC", Qt::QueuedConnection,
                                   Q_ARG(AVCodecParameters*, aParams));
         QMetaObject::invokeMethod(m_audioDecoder, "startDecoding", Qt::QueuedConnection);
