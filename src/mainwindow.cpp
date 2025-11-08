@@ -89,12 +89,12 @@ MainWindow::MainWindow(QWidget *parent)
     m_rtmpPublisher->moveToThread(m_rtmpPublisherThread);
     m_rtmpPublisherThread->start();
 
-    ////WebRTC推流线程
-    //m_webRTCPublisherThread = new QThread(this);
-    //m_webRTCPublisher = new WebRTCPublisher(m_publishPacketQueue);
-    //m_webRTCPublisher->moveToThread(m_webRTCPublisherThread);
-    //m_webRTCPublisherThread->start();
-    //QMetaObject::invokeMethod(m_webRTCPublisher, "initThread", Qt::QueuedConnection);
+    //WebRTC推流线程
+    m_webRTCPublisherThread = new QThread(this);
+    m_webRTCPublisher = new WebRTCPublisher(m_publishPacketQueue);
+    m_webRTCPublisher->moveToThread(m_webRTCPublisherThread);
+    m_webRTCPublisherThread->start();
+    QMetaObject::invokeMethod(m_webRTCPublisher, "initThread", Qt::QueuedConnection);// 为了初始化libdatachannel
 
     //获取可用设备
     QStringList videoDevices = DeviceEnumerator::getDevices(MediaType::Video);
@@ -119,7 +119,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_audioEncoder, &ffmpegEncoder::errorOccurred, this, &MainWindow::handleError);
     connect(m_videoEncoder, &ffmpegEncoder::errorOccurred, this, &MainWindow::handleError);
     connect(m_Capture, &Capture::errorOccurred, this, &MainWindow::handleError);
-    //connect(m_webRTCPublisher, &WebRTCPublisher::errorOccurred, this, &MainWindow::handleError);
+    connect(m_webRTCPublisher, &WebRTCPublisher::errorOccurred, this, &MainWindow::handleError);
 
     // 线程结束后，自动清理工作对象和线程本身
     connect(m_CaptureThread, &QThread::finished, m_Capture, &QObject::deleteLater);
@@ -127,7 +127,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_audioDecoderThread, &QThread::finished, m_audioDecoder, &QObject::deleteLater);
     connect(m_audioEncoderThread, &QThread::finished, m_audioEncoder, &QObject::deleteLater);
     connect(m_videoEncoderThread, &QThread::finished, m_videoEncoder, &QObject::deleteLater);
-    //connect(m_webRTCPublisherThread, &QThread::finished, m_webRTCPublisher, &QObject::deleteLater);
+    connect(m_webRTCPublisherThread, &QThread::finished, m_webRTCPublisher, &QObject::deleteLater);
 }
 
 MainWindow::~MainWindow() {
@@ -244,14 +244,26 @@ void MainWindow::on_openAudio_clicked() {
 
 //// 创建会议按钮
 void MainWindow::on_createmeetBtn_clicked() {
-	qDebug() << "IN on_createmeetBtn_clicked";
+    qDebug() << "on_createmeetBtn_clicked";
+    if (m_videoParams) {
+        qDebug("Initializing video pipeline(H264)");
+        QMetaObject::invokeMethod(m_videoEncoder, "initVideoEncoderH264", Qt::QueuedConnection,
+                                  Q_ARG(AVCodecParameters*, m_videoParams));
+        QMetaObject::invokeMethod(m_videoEncoder, "startEncoding", Qt::QueuedConnection);
+    }
+    if (m_audioParams) {
+        // 只需要初始化，startDecoding/Encoding 会在配置完成后自动处理
+        qDebug("Initializing audio pipeline(AAC)");
+        QMetaObject::invokeMethod(m_audioEncoder, "initAudioEncoderAAC", Qt::QueuedConnection,
+                                 Q_ARG(AVCodecParameters*, m_audioParams));
+        QMetaObject::invokeMethod(m_audioEncoder, "startEncoding", Qt::QueuedConnection);
+    }
+	
     connect(m_audioEncoder, &ffmpegEncoder::initializationSuccess, this, &MainWindow::audioEncoderReady);
     connect(m_videoEncoder, &ffmpegEncoder::initializationSuccess, this, &MainWindow::videoEncoderReady);
     if (m_isAudioRunning || m_isVideoRunning) {
         ui->createmeetBtn->setEnabled(true);
-        //QString rtmpUrl = ui->meetnum->text();
         QString rtmpUrl = "rtmp://127.0.0.1:1935/live/teststream";
-        //QString rtmpTest = "rtmp://rtmp://127.0.0.1:1935/live/teststream";
         WRITE_LOG("Joining meeting", rtmpUrl);
 		qDebug() << "Joining meeting in " << rtmpUrl;
 
@@ -263,7 +275,6 @@ void MainWindow::on_createmeetBtn_clicked() {
             return;
         }
          //// 初始化 RTMP 发布
-         // 使用 invokeMethod 异步调用 init 和 startPublishing
         if (!QMetaObject::invokeMethod(m_rtmpPublisher, "init",
             Qt::QueuedConnection,
             Q_ARG(QString, rtmpUrl),
@@ -285,16 +296,50 @@ void MainWindow::on_createmeetBtn_clicked() {
             return;
         }
 
-         ////WebRTC链接实现
-//      QString webRTCsignalingUrl = "http://10.0.0.10:1985/rtc/v1/publish/";
-//      QString webRTCstreamUrl = "webrtc://10.0.0.10/live/tsetstream"; 
-
-        //QMetaObject::invokeMethod(m_webRTCPublisher, "init", Qt::QueuedConnection,
-        //                          Q_ARG(QString, webRTCsignalingUrl),
-        //                          Q_ARG(QString, webRTCstreamUrl));
-
-        //QMetaObject::invokeMethod(m_webRTCPublisher, "startPublishing", Qt::QueuedConnection);
     } else {
+        ui->createmeetBtn->setEnabled(false);
+    }
+}
+
+void MainWindow::on_LiveStreamBtn_clicked() {
+    qDebug() << "on_LiveStreamBtn_clicked";
+    if (m_videoParams) {
+        qDebug("Initializing video pipeline(H264)");
+        QMetaObject::invokeMethod(m_videoEncoder, "initVideoEncoderH264", Qt::QueuedConnection,
+            Q_ARG(AVCodecParameters*, m_videoParams));
+        QMetaObject::invokeMethod(m_videoEncoder, "startEncoding", Qt::QueuedConnection);
+    }
+    if (m_audioParams) {
+        // 只需要初始化，startDecoding/Encoding 会在配置完成后自动处理
+        qDebug("Initializing audio pipeline(AAC)");
+        QMetaObject::invokeMethod(m_audioEncoder, "initAudioEncoderOpus", Qt::QueuedConnection,
+            Q_ARG(AVCodecParameters*, m_audioParams));
+        QMetaObject::invokeMethod(m_audioEncoder, "startEncoding", Qt::QueuedConnection);
+    }
+    connect(m_audioEncoder, &ffmpegEncoder::initializationSuccess, this, &MainWindow::audioEncoderReady);
+    connect(m_videoEncoder, &ffmpegEncoder::initializationSuccess, this, &MainWindow::videoEncoderReady);
+    if (m_isAudioRunning || m_isVideoRunning) {
+        ui->createmeetBtn->setEnabled(true);
+
+        AVCodecContext* videoCtx = m_videoEncoder->getCodecContext();
+        AVCodecContext* audioCtx = m_audioEncoder->getCodecContext();
+
+        if (!videoCtx || !audioCtx) {
+            QMessageBox::warning(this, "Error", "Encoders are not ready yet.");
+            return;
+        }
+
+        ////WebRTC链接实现
+        QString webRTCsignalingUrl = "http://10.0.0.10:1985/rtc/v1/publish/";
+        QString webRTCstreamUrl = "webrtc://10.0.0.10/live/tsetstream"; 
+
+        QMetaObject::invokeMethod(m_webRTCPublisher, "init", Qt::QueuedConnection,
+                                  Q_ARG(QString, webRTCsignalingUrl),
+                                  Q_ARG(QString, webRTCstreamUrl));
+
+        QMetaObject::invokeMethod(m_webRTCPublisher, "startPublishing", Qt::QueuedConnection);
+    }
+    else {
         ui->createmeetBtn->setEnabled(false);
     }
 }
@@ -304,37 +349,40 @@ void MainWindow::on_exitmeetBtn_clicked() {
     QMetaObject::invokeMethod(m_Capture, "closeDevice", Qt::QueuedConnection);
 }
 
-
 void MainWindow::onDeviceOpened(AVCodecParameters *vParams, AVCodecParameters *aParams, AVRational vTimeBase, AVRational aTimeBase) {
-    WRITE_LOG("Main thread: Device opened. Initializing...");
-    if (vParams) {
-        qDebug("Initializing video pipeline");
-        QMetaObject::invokeMethod(m_videoDecoder, "init", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, vParams),
-                                  Q_ARG(AVRational, vTimeBase));
-        QMetaObject::invokeMethod(m_videoEncoder, "initVideoEncoderH264", Qt::QueuedConnection,
-                                  Q_ARG(AVCodecParameters*, vParams));
+	// 传递数据包
+	m_videoParams = vParams;
+    m_audioParams = aParams;
+	m_audioTimeBase = aTimeBase;
+	m_videoTimeBase = vTimeBase;
+    qDebug() << "onDeviceOpened";
+    if (m_videoParams) {
+        qDebug("Initializing video decoder & rendering");
+        QMetaObject::invokeMethod(m_videoDecoder, "init", Qt::QueuedConnection,
+            Q_ARG(AVCodecParameters*, m_videoParams),
+            Q_ARG(AVRational, m_audioTimeBase));
         QMetaObject::invokeMethod(m_videoDecoder, "startDecoding", Qt::QueuedConnection);
-        QMetaObject::invokeMethod(m_videoEncoder, "startEncoding", Qt::QueuedConnection);
     }
-    if (aParams) {
-        // 只需要初始化，startDecoding/Encoding 会在配置完成后自动处理
-        qDebug("Initializing audio pipeline");
-        QMetaObject::invokeMethod(m_audioDecoder, "init", Qt::QueuedConnection, Q_ARG(AVCodecParameters*, aParams),
-                                 Q_ARG(AVRational, aTimeBase));
-        QMetaObject::invokeMethod(m_audioEncoder, "initAudioEncoderAAC", Qt::QueuedConnection,
-                                  Q_ARG(AVCodecParameters*, aParams));
+    if (m_audioParams) {
+        qDebug("Initializing audio pipeline(AAC)");
+        QMetaObject::invokeMethod(m_audioDecoder, "init", Qt::QueuedConnection,
+            Q_ARG(AVCodecParameters*, m_audioParams),
+            Q_ARG(AVRational, m_audioTimeBase));
         QMetaObject::invokeMethod(m_audioDecoder, "startDecoding", Qt::QueuedConnection);
-        QMetaObject::invokeMethod(m_audioEncoder, "startEncoding", Qt::QueuedConnection);
     }
     QMetaObject::invokeMethod(m_Capture, "startReading", Qt::QueuedConnection);
 }
 
 void MainWindow::audioEncoderReady() {
     m_audioEncoderReady = true;
+    QMetaObject::invokeMethod(m_audioDecoder, "ChangeEncodingState",
+		                      Q_ARG(bool, m_audioEncoderReady));
 }
 
 void MainWindow::videoEncoderReady() {
     m_videoEncoderReady = true;
+    QMetaObject::invokeMethod(m_videoDecoder, "ChangeEncodingState",
+                              Q_ARG(bool, m_videoEncoderReady));
 }
 
 void MainWindow::onNewFrameAvailable() {

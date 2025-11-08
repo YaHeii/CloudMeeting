@@ -135,8 +135,10 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         else {
             sendFrame->pts = AV_NOPTS_VALUE;
         }
-
+        if(m_isEncoding){
             m_frameQueue->enqueue(std::move(sendFrame));
+        }
+
 
         bool formatChanged = (m_swsSrcWidth != m_codecCtx->width ||
                               m_swsSrcHeight != m_codecCtx->height ||
@@ -183,6 +185,7 @@ void ffmpegVideoDecoder::doDecodingPacket() {
              //通知UI线程有新帧可用
             emit newFrameAvailable();
             //WRITE_LOG("NewFrameAvailable");
+			qDebug() << "NewFrameAvailable";
         }
         av_frame_unref(decodedFrame.get());
     }
@@ -194,6 +197,9 @@ void ffmpegVideoDecoder::doDecodingPacket() {
     }
 }
 
+void ffmpegVideoDecoder::ChangeEncodingState(bool isEncoding){
+        m_isEncoding = isEncoding;
+}
 
 void ffmpegVideoDecoder::clear() {
     stopDecoding(); 

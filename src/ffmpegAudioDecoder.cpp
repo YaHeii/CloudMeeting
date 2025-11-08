@@ -172,7 +172,9 @@ void ffmpegAudioDecoder::doDecodingPacket() {
                     m_inputTimeBase);
                 m_fifoBasePts += duration;
                 // --- 入队给编码器 ---
-                m_frameQueue->enqueue(std::move(sendFrame));
+                if(m_isEncoding){
+                    m_frameQueue->enqueue(std::move(sendFrame));
+				}
             }
         }
     }
@@ -182,6 +184,10 @@ void ffmpegAudioDecoder::doDecodingPacket() {
         QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
     }
 
+}
+
+void ffmpegAudioDecoder::ChangeEncodingState(bool isEncoding) {
+    m_isEncoding = isEncoding;
 }
 
 void ffmpegAudioDecoder::clear() {

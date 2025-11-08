@@ -14,7 +14,7 @@ void VideoWidget::updateFrame(const QImage *frame) {
         update();
         return;
     }
-    git
+    
     // 拷贝图像，因为发送者可能在发出信号后就销毁了原图像
     m_currentFrame = frame->copy();
     // 触发重绘事件，但不会立即执行，而是由Qt的事件循环在适当的时候调用paintEvent

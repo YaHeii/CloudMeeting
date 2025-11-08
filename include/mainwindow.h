@@ -38,6 +38,13 @@ private:
     bool m_isAudioRunning = false;
     bool m_isCaptureRunning = false;
 
+    /// 线程之间传递参数
+	AVCodecParameters* m_videoParams = nullptr;
+	AVCodecParameters* m_audioParams = nullptr;
+	AVRational m_videoTimeBase;
+	AVRational m_audioTimeBase;
+
+
     Ui::MainWindow *ui;
     quint32 mainip; //主屏幕显示的IP图像
 
@@ -61,7 +68,7 @@ private:
     QUEUE_DATA<AVFramePtr> *m_audioFrameQueue; //网络传输帧队列
 
     // --- 推流 ---
-    //WebRTCPublisher *m_webRTCPublisher; //WebRTC
+    WebRTCPublisher *m_webRTCPublisher; //WebRTC
     RtmpPublisher *m_rtmpPublisher; //RTMP
     QUEUE_DATA<AVPacketPtr> *m_publishPacketQueue; //发送队列
 
@@ -72,7 +79,7 @@ private:
     QThread *m_videoEncoderThread;
     QThread *m_audioEncoderThread;
     QThread *m_rtmpPublisherThread;
-    //QThread *m_webRTCPublisherThread;
+    QThread *m_webRTCPublisherThread;
 
     VideoWidget *m_videoWidget;
 
@@ -86,6 +93,7 @@ private slots:
 
     void on_exitmeetBtn_clicked(); //暂时使用退出会议来关闭视频音频
     void on_createmeetBtn_clicked();
+	void on_LiveStreamBtn_clicked();
 
     void onNewFrameAvailable();
 

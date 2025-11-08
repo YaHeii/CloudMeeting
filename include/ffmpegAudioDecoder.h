@@ -37,6 +37,7 @@ private:
     QUEUE_DATA<AVFramePtr> *m_frameQueue;
     std::atomic<bool> m_isDecoding = false;
     std::atomic<bool> m_isConfigReady = false;
+	std::atomic<bool> m_isEncoding = false;
 
     // FFmpeg-related members
     AVCodecContext *m_codecCtx = nullptr;
@@ -66,6 +67,8 @@ public slots:
     void setResampleConfig(const AudioResampleConfig &config);
 
     void doDecodingPacket();
+
+	void ChangeEncodingState(bool isEncoding);
 
 signals:
     void errorOccurred(const QString &errorText);
