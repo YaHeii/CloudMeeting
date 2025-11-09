@@ -47,17 +47,17 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 初始化队列
 	m_videoPacketQueue = new QUEUE_DATA<AVPacketPtr>();//采集到的视频包队列
-    m_QimageQueue = new QUEUE_DATA<std::unique_ptr<QImage> >();
+    m_SmallQimageQueue = new QUEUE_DATA<std::unique_ptr<QImage> >();
     m_videoFrameQueue = new QUEUE_DATA<AVFramePtr>();
     m_audioPacketQueue = new QUEUE_DATA<AVPacketPtr>();
     m_audioFrameQueue = new QUEUE_DATA<AVFramePtr>();
     m_publishPacketQueue = new QUEUE_DATA<AVPacketPtr>();
+	m_MainQimageQueue = new QUEUE_DATA<std::unique_ptr<QImage> >(); //拉流得到的显示队列，暂时不开启线程
 
 
     // 采集线程
     m_CaptureThread = new QThread(this);
-    m_Capture = new Capture();
-    m_Capture->setPacketQueue(m_videoPacketQueue, m_audioPacketQueue);
+    m_Capture = new Capture(m_videoPacketQueue, m_audioPacketQueue);
     m_Capture->moveToThread(m_CaptureThread);
     m_CaptureThread->start();
 
@@ -68,7 +68,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_audioDecoderThread->start();
     //视频解码线程
     m_videoDecoderThread = new QThread(this);
-    m_videoDecoder = new ffmpegVideoDecoder(m_videoPacketQueue, m_QimageQueue, m_videoFrameQueue);
+    m_videoDecoder = new ffmpegVideoDecoder(m_videoPacketQueue, m_SmallQimageQueue, m_videoFrameQueue);
     m_videoDecoder->moveToThread(m_videoDecoderThread);
     m_videoDecoderThread->start();
 
@@ -112,6 +112,10 @@ MainWindow::MainWindow(QWidget *parent)
     //// 音频
     connect(m_audioEncoder, &ffmpegEncoder::audioEncoderReady, m_audioDecoder, &ffmpegAudioDecoder::setResampleConfig,
             Qt::QueuedConnection);
+
+	QString rtmpPullerLink = ui->meetnum->text().toStdString().c_str();
+	m_rtmpPuller = new RtmpPuller(rtmpPullerLink, m_MainQimageQueue);
+
 
     //errorOccurred处理
     connect(m_videoDecoder, &ffmpegVideoDecoder::errorOccurred, this, &MainWindow::handleError);
@@ -185,7 +189,7 @@ void MainWindow::on_openVideo_clicked() {
         // --- 清空队列 ---
         m_videoPacketQueue->clear();
         m_videoFrameQueue->clear();
-        m_QimageQueue->clear();
+        m_SmallQimageQueue->clear();
 
 
         // --- 更新UI和状态 ---
@@ -241,10 +245,17 @@ void MainWindow::on_openAudio_clicked() {
     }
 }
 
+void MainWindow::on_joinmeetBtn_clicked() {
+    qDebug() << "on_joinmeetBtn_clicked";
+    m_rtmpPublisherThread = new QThread(this);
+    m_rtmpPublisher = new RtmpPublisher(m_publishPacketQueue);
+    m_rtmpPublisher->moveToThread(m_rtmpPublisherThread);
+    m_rtmpPublisherThread->start();
+}
 
-//// 创建会议按钮
-void MainWindow::on_createmeetBtn_clicked() {
-    qDebug() << "on_createmeetBtn_clicked";
+//// 开启直播按钮
+void MainWindow::on_LiveStreamBtn_clicked() {
+    qDebug() << "on_LiveStreamBtn_clicked";
     if (m_videoParams) {
         qDebug("Initializing video pipeline(H264)");
         QMetaObject::invokeMethod(m_videoEncoder, "initVideoEncoderH264", Qt::QueuedConnection,
@@ -300,9 +311,9 @@ void MainWindow::on_createmeetBtn_clicked() {
         ui->createmeetBtn->setEnabled(false);
     }
 }
-
-void MainWindow::on_LiveStreamBtn_clicked() {
-    qDebug() << "on_LiveStreamBtn_clicked";
+ // 创建会议按钮
+void MainWindow::on_createmeetBtn_clicked() {
+    qDebug() << "on_createmeetBtn_clicked";
     if (m_videoParams) {
         qDebug("Initializing video pipeline(H264)");
         QMetaObject::invokeMethod(m_videoEncoder, "initVideoEncoderH264", Qt::QueuedConnection,
@@ -331,7 +342,7 @@ void MainWindow::on_LiveStreamBtn_clicked() {
 
         ////WebRTC链接实现
         QString webRTCsignalingUrl = "http://10.0.0.10:1985/rtc/v1/publish/";
-        QString webRTCstreamUrl = "webrtc://10.0.0.10/live/tsetstream"; 
+        QString webRTCstreamUrl = "webrtc://10.0.0.10:8000/live/tsetstream"; 
 
         QMetaObject::invokeMethod(m_webRTCPublisher, "init", Qt::QueuedConnection,
                                   Q_ARG(QString, webRTCsignalingUrl),
@@ -388,7 +399,7 @@ void MainWindow::videoEncoderReady() {
 void MainWindow::onNewFrameAvailable() {
     // 这是在UI主线程中执行的
     std::unique_ptr<QImage> image;
-    if (m_QimageQueue->dequeue(image)) {
+    if (m_SmallQimageQueue->dequeue(image)) {
         if (image && !image->isNull()) {
             m_videoWidget->updateFrame(image.get());
         }

@@ -6,8 +6,10 @@
 
 bool ffmpegInputInitialized = false;
 
-Capture::Capture(QObject* parent) : QObject(parent) {
+Capture::Capture(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue, QObject* parent = nullptr) : QObject(parent) {
     initializeFFmpeg();
+    m_videoPacketQueue = videoQueue;
+    m_audioPacketQueue = audioQueue;
 }
 
 void Capture::initializeFFmpeg() {
@@ -29,12 +31,7 @@ Capture::~Capture() {
     WRITE_LOG("VideoCapture destroyed.");
 }
 
-void Capture::setPacketQueue(QUEUE_DATA<AVPacketPtr> *videoQueue, QUEUE_DATA<AVPacketPtr> *audioQueue) {
-    // 线程安全地设置队列指针
-    QMutexLocker locker(&m_workMutex);
-    m_videoPacketQueue = videoQueue;
-    m_audioPacketQueue = audioQueue;
-}
+
 
 void Capture::openDevice(const QString &videoDeviceName, const QString &audioDeviceName) {
     if (m_FormatCtx) {
@@ -179,7 +176,8 @@ void Capture::doReadFrame() {
     if (!m_isReading.load()) {
         WRITE_LOG("Reading loop gracefully stopped.");
         return;
-    } {
+    } 
+    {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = true;
     }

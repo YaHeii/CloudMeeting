@@ -33,7 +33,10 @@ add_executable(CloudMeeting
         src/RtmpPublisher.cpp
         src/screen.cpp
         src/VideoWidget.cpp
-        "src/WebRTCPublisher.cpp"
+        src/WebRTCPublisher.cpp
+        src/RtmpAudioPlayer.cpp
+        src/RtmpPuller.cpp
+
 
         include/AudioResampleConfig.h
         include/Capture.h
@@ -51,6 +54,10 @@ add_executable(CloudMeeting
         include/screen.h 
         include/ThreadSafeQueue.h 
         include/VideoWidget.h
+        include/netheader.h
+        include/RtmpAudioPlayer.h
+        include/RtmpPuller.h
+
 )
 set_target_properties(CloudMeeting PROPERTIES
     AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/ui"

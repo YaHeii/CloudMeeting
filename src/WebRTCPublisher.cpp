@@ -103,8 +103,6 @@ void WebRTCPublisher::initializePeerConnection() {
         // 设置打包器到轨道  
         m_audioTrack->setMediaHandler(opusPacketizer);
 
-
-
         /// description回调
         m_peerConnection->onLocalDescription([this](const rtc::Description &description) {
             auto descriptionToString = [](rtc::Description::Type type) {
@@ -142,19 +140,7 @@ void WebRTCPublisher::initializePeerConnection() {
                 }
         });
 
-        //m_peerConnection->onLocalDescription([this](const rtc::Description& description) {
-        //    std::string sdp = std::string(description);
 
-        //    // 手动清理和简化SDP
-        //    sdp = cleanupSdp(sdp);
-
-        //    WRITE_LOG("Cleaned SDP Offer:\n%s", sdp.c_str());
-
-        //    // 使用清理后的SDP
-        //    QMetaObject::invokeMethod(this, [this, sdp]() {
-        //        sendOfferToSignalingServer(sdp);
-        //        }, Qt::QueuedConnection);
-        //    });
         /// ICE State回调
         m_peerConnection->onGatheringStateChange([this](rtc::PeerConnection::GatheringState state) {
             auto stateToString = [](rtc::PeerConnection::GatheringState s) {
@@ -173,6 +159,10 @@ void WebRTCPublisher::initializePeerConnection() {
                     WRITE_LOG("ICE Gathering complete. Sending offer to server.");
                     std::string sdp_offer = description.value();
 					WRITE_LOG("Local SDP Offer:\n%s", sdp_offer.c_str());
+
+                    sdp_offer = cleanupSdp(sdp_offer);
+                    WRITE_LOG("Cleaned SDP Offer:\n%s", sdp_offer.c_str());
+
                     QMetaObject::invokeMethod(this, [this, sdp_offer]() {
                         sendOfferToSignalingServer(sdp_offer);
 						}, Qt::QueuedConnection);
@@ -197,38 +187,64 @@ void WebRTCPublisher::initializePeerConnection() {
         });
         //完成回调后添加offer，防止竞态
         m_peerConnection->setLocalDescription();
+        WRITE_LOG("Local description set, waiting for ICE gathering...");
     } catch (const std::exception &e) {
         QString error = QString("Failed to create PeerConnection: %1").arg(e.what());
         WRITE_LOG(error.toStdString().c_str());
         emit errorOccurred(error);
     }
 }
-//// SDP清理函数
-//std::string WebRTCPublisher::cleanupSdp(const std::string& originalSdp) {
-//    std::stringstream ss(originalSdp); // 使用 istringstream
-//    std::string line;
-//    std::string cleanedSdp;
-//
-//    //while (std::getline(ss, line)) {
-//    //    // 移除可能有问题行
-//    //    if (line.find("a=group:LS") != std::string::npos) {
-//    //        continue; // 跳过LS组
-//    //    }
-//    //    if (line.find("a=ice-options:ice2") != std::string::npos) {
-//    //        continue; // 跳过ice2选项
-//    //    }
-//    //    // 简化opus配置
-//    //    if (line.find("fmtp:111") != std::string::npos) {
-//    //        cleanedSdp += "a=fmtp:111 minptime=10;useinbandfec=1\r\n";
-//    //        continue;
-//    //    }
-//    //    // 保留其他行
-//    //    cleanedSdp += line;
-//    //}
-//    cleanedSdp =
-//    
-//    return cleanedSdp;
-//}
+std::string WebRTCPublisher::cleanupSdp(const std::string& originalSdp) {
+    std::istringstream ss(originalSdp);
+    std::string line;
+    std::string cleanedSdp;
+    int mediaIndex = 0;
+
+    while (std::getline(ss, line)) {
+        // 移除可能不兼容的行
+        if (line.find("a=group:LS") != std::string::npos) {
+            continue; // SRS不支持LS组
+        }
+        if (line.find("a=ice-options:") != std::string::npos) {
+            continue; // 移除ice2/trickle选项
+        }
+        if (line.find("a=msid-semantic:") != std::string::npos) {
+            continue; // SRS会生成自己的msid-semantic
+        }
+
+        // 修正m行端口为标准的9
+        if (line.find("m=video") == 0) {
+            line = "m=video 9 UDP/TLS/RTP/SAVPF 96 97";
+        }
+        if (line.find("m=audio") == 0) {
+            line = "m=audio 9 UDP/TLS/RTP/SAVPF 111";
+        }
+
+        // 将mid从文字改为数字
+        if (line.find("a=mid:video") != std::string::npos) {
+            line = "a=mid:0";
+        }
+        if (line.find("a=mid:audio") != std::string::npos) {
+            line = "a=mid:1";
+        }
+
+        // 修正BUNDLE行为数字
+        if (line.find("a=group:BUNDLE") == 0) {
+            line = "a=group:BUNDLE 0 1";
+        }
+
+        // 移除c行，由ICE决定
+        if (line.find("c=IN IP4") == 0 && line.find("0.0.0.0") == std::string::npos) {
+            // 保留c=IN IP4 0.0.0.0，移除具体IP
+            continue;
+        }
+
+        cleanedSdp += line + "\r\n";
+    }
+
+    return cleanedSdp;
+}
+
 void WebRTCPublisher::startPublishing() {
     if (m_isPublishing) {
         WRITE_LOG("WebRTC publisher is already running.");
@@ -257,9 +273,10 @@ void WebRTCPublisher::stopPublishing() {
 
 void WebRTCPublisher::sendOfferToSignalingServer(const std::string &sdp) {
     QJsonObject jsonPayload;
-
-    jsonPayload["sdp"] = QString::fromStdString(sdp);
+    jsonPayload["api"] = m_signalingUrl;
     jsonPayload["streamurl"] = m_streamUrl;
+    jsonPayload["sdp"] = QString::fromStdString(sdp);
+
 
     QJsonDocument doc(jsonPayload);
     QByteArray body = doc.toJson();
@@ -269,6 +286,8 @@ void WebRTCPublisher::sendOfferToSignalingServer(const std::string &sdp) {
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     WRITE_LOG("Sending Offer SDP to %s", m_signalingUrl.toStdString().c_str());
+    WRITE_LOG("Request JSON:\n%s", body.constData());
+
     QNetworkReply *response = nullptr;
     if (!m_networkManager) {
         WRITE_LOG("ERROR: m_networkManager is null when sending offer.");
@@ -323,6 +342,10 @@ void WebRTCPublisher::onSignalingReply(QNetworkReply *response) {
         emit errorOccurred("Null response received");
         return;
     }
+	//HTTP状态码检查
+    int httpStatus = response->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    WRITE_LOG("HTTP Status Code: %d", httpStatus);
+
 	//检查网络错误
     if (response->error() != QNetworkReply::NoError) {
         QString error = QString("Network error: %1 (HTTP: %2)")
@@ -337,6 +360,7 @@ void WebRTCPublisher::onSignalingReply(QNetworkReply *response) {
     QByteArray response_data = response->readAll();
     WRITE_LOG("Received response from signaling server, size: %d bytes", response_data.size());
     WRITE_LOG("Response content: %s", response_data.constData());
+
 	//解析JSON
     QJsonParseError parseError;
     QJsonDocument jsonDoc = QJsonDocument::fromJson(response_data, &parseError);

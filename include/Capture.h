@@ -4,7 +4,7 @@
 *    QUEUE_DATA<AVPacketPtr>* m_VideopacketQueue = nullptr;
      QUEUE_DATA<AVPacketPtr>* m_AudiopacketQueue = nullptr;
  */
-//// TODO:对这个类进行重构
+
 #ifndef FFMPEGINPUT_H
 #define FFMPEGINPUT_H
 #include <QObject>
@@ -27,11 +27,11 @@ class Capture : public QObject {
     Q_OBJECT
 
 public:
-    explicit Capture(QObject *parent = nullptr);
+    explicit Capture(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue, QObject *parent = nullptr);
 
     ~Capture();
 
-    void setPacketQueue(QUEUE_DATA<AVPacketPtr> *videoQueue, QUEUE_DATA<AVPacketPtr> *audioQueue);
+
 
 private:
     AVFormatContext *m_FormatCtx = nullptr;
