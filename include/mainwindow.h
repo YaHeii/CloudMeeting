@@ -14,6 +14,7 @@
 #include "RtmpPublisher.h"
 #include "WebRTCPublisher.h"
 #include "RtmpPuller.h"
+#include "screen.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -73,7 +74,7 @@ private:
     // --- 推流 ---
     WebRTCPublisher *m_webRTCPublisher; //WebRTC
     RtmpPublisher *m_rtmpPublisher; //RTMP
-    RtmpPuller* m_rtmpPuller; //RTMP拉流
+    RtmpPuller *m_rtmpPuller; //RTMP拉流
 
 
 

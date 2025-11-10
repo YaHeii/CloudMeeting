@@ -11,6 +11,17 @@
 #include "AVSmartPtrs.h"
 #include <libavformat/avformat.h>
 #include "RtmpAudioPlayer.h"
+#include "ffmpegVideoDecoder.h"
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+#include "logqueue.h"
+#include "log_global.h"
+#include "netheader.h"
+#include "screen.h"
+#include "DeviceEnumerator.h"
+#include <QMessageBox>
+#include "AudioResampleConfig.h"
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
@@ -24,18 +35,18 @@ public:
 
     ~RtmpPuller();
 
-    //RtmpPuller是一个独立的播放模块，内部管理音视频解码线程和音频播放线程
-    //启动内部所有线程
     void startPulling();
     
     void stopPulling();
 private:
+    bool initialize();
     void clear();
+    void doPullingWork();
 
     QUEUE_DATA<std::unique_ptr<QImage> >* m_MainQimageQueue;
-    QUEUE_DATA<AVPacketPtr> m_videoPacketQueue;
-	QUEUE_DATA<AVPacketPtr> m_audioPacketQueue;
-	QUEUE_DATA<AVFramePtr> m_dummyVideoFrameQueue;
+    QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue;
+	QUEUE_DATA<AVPacketPtr>* m_audioPacketQueue;
+	QUEUE_DATA<AVFramePtr>* m_dummyVideoFrameQueue;
 
     AVFormatContext* m_fmtCtx = nullptr;
     int m_videoStreamIndex = -1;
@@ -52,8 +63,9 @@ private:
 
 signals:
     void errorOccurred(const QString& errorText);
-    void streamStarted();
-    void streamFinished();
+    void streamOpened(AVCodecParameters* vParams, AVCodecParameters* aParams,
+        AVRational vTimeBase, AVRational aTimeBase);
+    void streamClosed();
 
 public slots:
 	void ChangePullingState(bool isDecoding);

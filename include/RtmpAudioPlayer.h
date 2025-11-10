@@ -22,7 +22,7 @@ class RtmpAudioPlayer : public QObject {
     Q_OBJECT
 
 public:
-    explicit RtmpAudioPlayer(std::shared_ptr<QUEUE_DATA<AVPacketPtr>> packetQueue,
+    explicit RtmpAudioPlayer(QUEUE_DATA<AVPacketPtr>* packetQueue,
         QObject* parent = nullptr);
     ~RtmpAudioPlayer();
 
@@ -30,7 +30,7 @@ signals:
     void errorOccurred(const QString& errorText);
 
 public slots:
-    // 由 RtmpPuller 在 streamOpened 信号中调用
+
     bool init(AVCodecParameters* params, AVRational inputTimeBase);
     void startPlaying();
     void stopPlaying();
@@ -40,25 +40,25 @@ private slots:
 
 private:
     void cleanup();
-    bool initAudioOutput(AVFrame* frame); // 初始化 QAudioSink
+    bool initAudioOutput(AVFrame* frame);
 
-    std::shared_ptr<QUEUE_DATA<AVPacketPtr>> m_packetQueue;
+    QUEUE_DATA<AVPacketPtr>* m_packetQueue;
     std::atomic<bool> m_isDecoding = { false };
 
     AVCodecContext* m_codecCtx = nullptr;
     SwrContext* m_swrCtx = nullptr;
     AVRational m_inputTimeBase;
 
-    // QAudioSink 用于播放
+
     QAudioSink* m_audioSink = nullptr;
     QIODevice* m_audioDevice = nullptr;
 
-    // 重采样缓冲区
+
     uint8_t** m_resampledData = nullptr;
     int m_resampledDataSize = 0;
     int m_resampledLinesize = 0;
 
-    // 线程同步
+
     QMutex m_workMutex;
     QWaitCondition m_workCond;
     std::atomic<bool> m_isDoingWork = { false };

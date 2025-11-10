@@ -5,7 +5,7 @@
 #include <QMediaDevices>
 #include <libavutil/error.h>
 
-RtmpAudioPlayer::RtmpAudioPlayer(std::shared_ptr<QUEUE_DATA<AVPacketPtr>> packetQueue,
+RtmpAudioPlayer::RtmpAudioPlayer(QUEUE_DATA<AVPacketPtr>* packetQueue,
     QObject* parent)
     : QObject{ parent }, m_packetQueue(packetQueue) {
 }
@@ -40,26 +40,26 @@ bool RtmpAudioPlayer::init(AVCodecParameters* params, AVRational inputTimeBase) 
 }
 
 bool RtmpAudioPlayer::initAudioOutput(AVFrame* frame) {
-    // ÉèÖÃÖØ²ÉÑùÆ÷ (SwrContext)£¬Ä¿±ê¸ñÊ½Îª QAudioSink Ö§³ÖµÄ¸ñÊ½
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ø²ï¿½ï¿½ï¿½ï¿½ï¿½ (SwrContext)ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½Ê½Îª QAudioSink Ö§ï¿½ÖµÄ¸ï¿½Ê½
 
-    // QAudioFormat ÆÚÍûµÄ¸ñÊ½ (ÀýÈç S16LE)
+    // QAudioFormat ï¿½ï¿½ï¿½ï¿½ï¿½Ä¸ï¿½Ê½ (ï¿½ï¿½ï¿½ï¿½ S16LE)
     AVSampleFormat out_sample_fmt = AV_SAMPLE_FMT_S16;
     QAudioFormat::SampleFormat q_sample_format = QAudioFormat::Int16;
 
-    // Ä¿±êÍ¨µÀ²¼¾Ö
+    // Ä¿ï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     AVChannelLayout out_ch_layout;
-    av_channel_layout_default(&out_ch_layout, 2); // Ç¿ÖÆÁ¢ÌåÉù
+    av_channel_layout_default(&out_ch_layout, 2); // Ç¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-    // Ä¿±ê²ÉÑùÂÊ
+    // Ä¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     int out_sample_rate = 48000;
 
-    // ÊÍ·Å¾ÉµÄ
+    // ï¿½Í·Å¾Éµï¿½
     if (m_swrCtx) swr_free(&m_swrCtx);
 
     swr_alloc_set_opts2(&m_swrCtx,
-        &out_ch_layout,      // Ä¿±ê
-        out_sample_fmt,      // Ä¿±ê
-        out_sample_rate,     // Ä¿±ê
+        &out_ch_layout,      // Ä¿ï¿½ï¿½
+        out_sample_fmt,      // Ä¿ï¿½ï¿½
+        out_sample_rate,     // Ä¿ï¿½ï¿½
         &frame->ch_layout,   // Ô´
         (AVSampleFormat)frame->format, // Ô´
         frame->sample_rate,  // Ô´
@@ -70,7 +70,7 @@ bool RtmpAudioPlayer::initAudioOutput(AVFrame* frame) {
         return false;
     }
 
-    // ³õÊ¼»¯ QAudioSink
+    // ï¿½ï¿½Ê¼ï¿½ï¿½ QAudioSink
     if (m_audioSink) {
         m_audioSink->stop();
         delete m_audioSink;
@@ -84,10 +84,10 @@ bool RtmpAudioPlayer::initAudioOutput(AVFrame* frame) {
     const QAudioDevice& defaultDevice = QMediaDevices::defaultAudioOutput();
     m_audioSink = new QAudioSink(defaultDevice, format, this);
 
-    // (¿ÉÑ¡) ÉèÖÃ»º³åÇø´óÐ¡
-    m_audioSink->setBufferSize(out_sample_rate * out_ch_layout.nb_channels * 2 * 0.5); // 0.5Ãë
+    // (ï¿½ï¿½Ñ¡) ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡
+    m_audioSink->setBufferSize(out_sample_rate * out_ch_layout.nb_channels * 2 * 0.5); // 0.5ï¿½ï¿½
 
-    m_audioDevice = m_audioSink->start(); // ¿ªÊ¼²¥·Å£¬»ñÈ¡ QIODevice
+    m_audioDevice = m_audioSink->start(); // ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½Å£ï¿½ï¿½ï¿½È¡ QIODevice
     if (!m_audioDevice) {
         emit errorOccurred("AudioPlayer: Failed to start QAudioSink.");
         return false;
@@ -106,7 +106,7 @@ void RtmpAudioPlayer::startPlaying() {
 
 void RtmpAudioPlayer::stopPlaying() {
     m_isDecoding = false;
-    // Ê¹ÓÃÓë ffmpegVideoDecoder::clear() ÏàÍ¬µÄÍ¬²½»úÖÆ
+    // Ê¹ï¿½ï¿½ï¿½ï¿½ ffmpegVideoDecoder::clear() ï¿½ï¿½Í¬ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     {
         QMutexLocker locker(&m_workMutex);
         while (m_isDoingWork) {
@@ -154,7 +154,7 @@ void RtmpAudioPlayer::doDecodingWork() {
         return;
     }
 
-    // Ëø (¸´ÖÆ×Ô ffmpegVideoDecoder::doDecodingPacket)
+    // ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ffmpegVideoDecoder::doDecodingPacket)
     {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = true;
@@ -176,7 +176,7 @@ void RtmpAudioPlayer::doDecodingWork() {
         while (avcodec_receive_frame(m_codecCtx, decoded_frame.get()) == 0) {
             if (!m_isDecoding) break;
 
-            // 1. Ê×´Î½ÓÊÕµ½Ö¡Ê±£¬³õÊ¼»¯ QAudioSink ºÍ SwrContext
+            // 1. ï¿½×´Î½ï¿½ï¿½Õµï¿½Ö¡Ê±ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ QAudioSink ï¿½ï¿½ SwrContext
             if (!m_audioSink) {
                 if (!initAudioOutput(decoded_frame.get())) {
                     m_isDecoding = false;
@@ -184,8 +184,8 @@ void RtmpAudioPlayer::doDecodingWork() {
                 }
             }
 
-            // 2. ·ÖÅäÖØ²ÉÑù»º³åÇø
-            // (»ùÓÚ ffmpegAudioDecoder::setResampleConfig µÄÂß¼­)
+            // 2. ï¿½ï¿½ï¿½ï¿½ï¿½Ø²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+            // (ï¿½ï¿½ï¿½ï¿½ ffmpegAudioDecoder::setResampleConfig ï¿½ï¿½ï¿½ß¼ï¿½)
             int dst_nb_samples = av_rescale_rnd(decoded_frame->nb_samples,
                 m_audioSink->format().sampleRate(),
                 decoded_frame->sample_rate, AV_ROUND_UP);
@@ -199,7 +199,7 @@ void RtmpAudioPlayer::doDecodingWork() {
                 m_resampledDataSize = dst_nb_samples;
             }
 
-            // 3. ÖØ²ÉÑù
+            // 3. ï¿½Ø²ï¿½ï¿½ï¿½
             int samples_converted = swr_convert(m_swrCtx,
                 m_resampledData, dst_nb_samples,
                 (const uint8_t**)decoded_frame->data,
@@ -207,14 +207,14 @@ void RtmpAudioPlayer::doDecodingWork() {
 
             if (samples_converted <= 0) continue;
 
-            // 4. ¼ÆËã»º³åÇø´óÐ¡²¢Ð´Èë QAudioSink
+            // 4. ï¿½ï¿½ï¿½ã»ºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡ï¿½ï¿½Ð´ï¿½ï¿½ QAudioSink
             int buffer_size = av_samples_get_buffer_size(&m_resampledLinesize,
                 m_audioSink->format().channelCount(),
                 samples_converted,
                 AV_SAMPLE_FMT_S16, 1);
 
             if (m_audioDevice) {
-                // (¿ÉÑ¡) ¼ì²é»º³åÇø¿ÕÏÐ¿Õ¼ä£¬ÊµÏÖÒôÊÓÆµÍ¬²½
+                // (ï¿½ï¿½Ñ¡) ï¿½ï¿½é»ºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¿Õ¼ä£¬Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÆµÍ¬ï¿½ï¿½
                 // int free_bytes = m_audioSink->bytesFree();
                 // while (free_bytes < buffer_size && m_isDecoding) {
                 //     QThread::msleep(10);

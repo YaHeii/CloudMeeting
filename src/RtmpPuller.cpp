@@ -1,7 +1,10 @@
 #include "RtmpPuller.h"
 #include "logqueue.h"
 #include "log_global.h"
-
+#include "RtmpAudioPlayer.h"
+#include <QApplication>
+#include <QScreen>
+#include <QDebug>
 
 RtmpPuller::RtmpPuller(QString rtmpPullerLink, 
 	QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue, 
@@ -12,9 +15,9 @@ RtmpPuller::RtmpPuller(QString rtmpPullerLink,
 	m_audioPacketQueue = new QUEUE_DATA<AVPacketPtr>();
 	m_dummyVideoFrameQueue = new QUEUE_DATA<AVFramePtr>();
 
-	m_videoDecoder = new ffmpegVideoDecoder(m_videoPacketQueue.get(),
-		m_extQimageQueue.get(), //  π”√Õ‚≤ø QImage ∂”¡–
-		m_dummyVideoFrameQueue.get());
+	m_videoDecoder = new ffmpegVideoDecoder(m_videoPacketQueue,
+		m_MainQimageQueue, // ‰ΩøÁî®Â§ñÈÉ® QImage ÈòüÂàó
+		m_dummyVideoFrameQueue);
 
 	m_audioPlayer = new RtmpAudioPlayer(m_audioPacketQueue);
 
@@ -29,7 +32,7 @@ RtmpPuller::RtmpPuller(QString rtmpPullerLink,
 	connect(this, &RtmpPuller::streamOpened,
 		this, &RtmpPuller::onStreamOpened_initAudio, Qt::QueuedConnection);
 
-	// ◊™∑¢¥ÌŒÛ–≈∫≈
+	// ËΩ¨ÂèëÈîôËØØ‰ø°Âè∑
 	connect(m_videoDecoder, &ffmpegVideoDecoder::errorOccurred, this, &RtmpPuller::errorOccurred);
 	connect(m_audioPlayer, &RtmpAudioPlayer::errorOccurred, this, &RtmpPuller::errorOccurred);
 
@@ -61,7 +64,7 @@ void RtmpPuller::startPulling() {
 	m_audioPlayThread->start();
 	
 	AVDictionary* opts = nullptr;
-	av_dict_set(&opts, "stimeout", "5000000", 0);  // 5√Î≥¨ ±
+	av_dict_set(&opts, "stimeout", "5000000", 0);  // 5ÁßíË∂ÖÊó∂
 	av_dict_set(&opts, "probesize", "4096", 0);
 	int ret = avformat_open_input(&m_fmtCtx, m_rtmpPullerLink.toStdString().c_str(), nullptr, &opts);
 	av_dict_free(&opts);
@@ -77,27 +80,26 @@ void RtmpPuller::startPulling() {
 
 	m_videoStreamIndex = av_find_best_stream(m_fmtCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
 	m_audioStreamIndex = av_find_best_stream(m_fmtCtx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
-	
-	doPullingWork();
+	QMetaObject::invokeMethod(this, "doPullingWork", Qt::QueuedConnection);
 }
 
 void RtmpPuller::stopPulling() {
 	if (!m_isPulling) return;
 	WRITE_LOG("RtmpPuller: Stopping all threads...");
 
-	// 1. …Ë÷√±Í÷æ£¨’‚Ω´
+	// 1. ËÆæÁΩÆÊ†áÂøóÔºåËøôÂ∞Ü
 	m_isPulling = false;
 
-	// 2. Õ£÷π◊”œﬂ≥Ãµƒπ§◊˜—≠ª∑
-	//    ( π”√ QMetaObject::invokeMethod »∑±£‘⁄’˝»∑µƒœﬂ≥Ã÷–µ˜”√)
+	// 2. ÂÅúÊ≠¢Â≠êÁ∫øÁ®ãÁöÑÂ∑•‰ΩúÂæ™ÁéØ
+	//    (‰ΩøÁî® QMetaObject::invokeMethod Á°Æ‰øùÂú®Ê≠£Á°ÆÁöÑÁ∫øÁ®ã‰∏≠Ë∞ÉÁî®)
 	QMetaObject::invokeMethod(m_videoDecoder, "stopDecoding", Qt::BlockingQueuedConnection);
 	QMetaObject::invokeMethod(m_audioPlayer, "stopPlaying", Qt::BlockingQueuedConnection);
 
-	// 3. «Âø’∂”¡–£¨ªΩ–—À˘”–‘⁄ dequeue …œµ»¥˝µƒœﬂ≥Ã
+	// 3. Ê∏ÖÁ©∫ÈòüÂàóÔºåÂî§ÈÜíÊâÄÊúâÂú® dequeue ‰∏äÁ≠âÂæÖÁöÑÁ∫øÁ®ã
 	m_videoPacketQueue->clear();
 	m_audioPacketQueue->clear();
 
-	// 4. ÕÀ≥ˆ≤¢µ»¥˝◊”œﬂ≥Ã QThread Ω· ¯
+	// 4. ÈÄÄÂá∫Âπ∂Á≠âÂæÖÂ≠êÁ∫øÁ®ã QThread ÁªìÊùü
 	if (m_videoDecodeThread && m_videoDecodeThread->isRunning()) {
 		m_videoDecodeThread->quit();
 		m_videoDecodeThread->wait();
@@ -105,11 +107,6 @@ void RtmpPuller::stopPulling() {
 	if (m_audioPlayThread && m_audioPlayThread->isRunning()) {
 		m_audioPlayThread->quit();
 		m_audioPlayThread->wait();
-	}
-
-	// 5. µ»¥˝ RtmpPuller ◊‘º∫µƒ run() œﬂ≥ÃΩ· ¯
-	if (this->isRunning()) {
-		this->wait();
 	}
 
 	WRITE_LOG("RtmpPuller: All threads stopped.");
@@ -121,7 +118,7 @@ void RtmpPuller::clear() {
 	stopPulling();
 
 
-	//  Õ∑≈◊”œﬂ≥Ã∫Õπ§◊˜∂‘œÛ
+	// ÈáäÊîæÂ≠êÁ∫øÁ®ãÂíåÂ∑•‰ΩúÂØπË±°
 	delete m_videoDecodeThread;
 	delete m_videoDecoder;
 	delete m_audioPlayThread;
@@ -135,19 +132,19 @@ void RtmpPuller::clear() {
 	WRITE_LOG("RtmpPuller resources cleared.");
 }
 
-// ‘⁄ RtmpPuller (Demuxer) œﬂ≥Ã÷–≥ı ºªØΩ‚¬Î∆˜
+// Âú® RtmpPuller (Demuxer) Á∫øÁ®ã‰∏≠ÂàùÂßãÂåñËß£Á†ÅÂô®
 void RtmpPuller::onStreamOpened_initVideo(AVCodecParameters* vParams, AVCodecParameters* aParams, AVRational vTimeBase, AVRational aTimeBase) {
 	Q_UNUSED(aParams);
 	Q_UNUSED(aTimeBase);
 
 	if (vParams) {
 		WRITE_LOG("RtmpPuller: Initializing video decoder...");
-		// øÁœﬂ≥Ãµ˜”√ ffmpegVideoDecoder::init
+		// Ë∑®Á∫øÁ®ãË∞ÉÁî® ffmpegVideoDecoder::init
 		if (QMetaObject::invokeMethod(m_videoDecoder, "init",
 			Q_ARG(AVCodecParameters*, vParams),
 			Q_ARG(AVRational, vTimeBase)))
 		{
-			// ≥…π¶∫Û£¨∆Ù∂Ø ”∆µΩ‚¬Î—≠ª∑
+			// ÊàêÂäüÂêéÔºåÂêØÂä®ËßÜÈ¢ëËß£Á†ÅÂæ™ÁéØ
 			QMetaObject::invokeMethod(m_videoDecoder, "startDecoding", Qt::QueuedConnection);
 		}
 		else {
@@ -162,12 +159,12 @@ void RtmpPuller::onStreamOpened_initAudio(AVCodecParameters* vParams, AVCodecPar
 
 	if (aParams) {
 		WRITE_LOG("RtmpPuller: Initializing audio player...");
-		// øÁœﬂ≥Ãµ˜”√ RtmpAudioPlayer::init
+		// Ë∑®Á∫øÁ®ãË∞ÉÁî® RtmpAudioPlayer::init
 		if (QMetaObject::invokeMethod(m_audioPlayer, "init",
 			Q_ARG(AVCodecParameters*, aParams),
 			Q_ARG(AVRational, aTimeBase)))
 		{
-			// ≥…π¶∫Û£¨∆Ù∂Ø“Ù∆µΩ‚¬Î≤•∑≈—≠ª∑
+			// ÊàêÂäüÂêéÔºåÂêØÂä®Èü≥È¢ëËß£Á†ÅÊí≠ÊîæÂæ™ÁéØ
 			QMetaObject::invokeMethod(m_audioPlayer, "startPlaying", Qt::QueuedConnection);
 		}
 		else {
@@ -176,15 +173,12 @@ void RtmpPuller::onStreamOpened_initAudio(AVCodecParameters* vParams, AVCodecPar
 	}
 }
 
-bool RtmpPuller::initialize() {
+bool RtmpPuller::initialize() { 
 	m_fmtCtx = avformat_alloc_context();
 	if (!m_fmtCtx) {
 		emit errorOccurred("RtmpPuller: Failed to allocate AVFormatContext");
 		return false;
 	}
-
-	m_fmtCtx->interrupt_callback.callback = RtmpPuller::interruptCallback;
-	m_fmtCtx->interrupt_callback.opaque = this;
 
 	AVDictionary* opts = nullptr;
 	av_dict_set(&opts, "stimeout", "5000000", 0);
@@ -193,7 +187,7 @@ bool RtmpPuller::initialize() {
 	int ret = avformat_open_input(&m_fmtCtx, m_rtmpPullerLink.toStdString().c_str(), nullptr, &opts);
 	av_dict_free(&opts);
 	if (ret < 0) {
-		emit errorOccurred(QString("RtmpPuller: Failed to open stream: %1").arg(avErrorToString(ret)));
+		//emit errorOccurred(QString("RtmpPuller: Failed to open stream: %1").arg(avErrorToString(ret)));
 		return false;
 	}
 
@@ -217,15 +211,15 @@ void RtmpPuller::doPullingWork() {
 	m_isPulling = true;
 
 	if (!initialize()) {
-		cleanup(); // «Â¿Ì“—∑÷≈‰µƒ◊ ‘¥
+		clear(); // Ê∏ÖÁêÜÂ∑≤ÂàÜÈÖçÁöÑËµÑÊ∫ê
 		m_isPulling = false;
 		return;
 	}
 
 	WRITE_LOG("RtmpPuller (Demuxer) thread started. VideoIdx: %d, AudioIdx: %d", m_videoStreamIndex, m_audioStreamIndex);
 
-	// --- Ã·»°≤Œ ˝≤¢∑¢ÀÕ–≈∫≈ ---
-	// (’‚±ÿ–Î‘⁄ initialize() ÷Æ∫Û£¨‘⁄—≠ª∑ø™ º÷Æ«∞)
+	// --- ÊèêÂèñÂèÇÊï∞Âπ∂ÂèëÈÄÅ‰ø°Âè∑ ---
+	// (ËøôÂøÖÈ°ªÂú® initialize() ‰πãÂêéÔºåÂú®Âæ™ÁéØÂºÄÂßã‰πãÂâç)
 	AVCodecParameters* vParams = nullptr;
 	AVCodecParameters* aParams = nullptr;
 	AVRational vTimeBase = { 0, 1 };
@@ -240,19 +234,19 @@ void RtmpPuller::doPullingWork() {
 		aTimeBase = m_fmtCtx->streams[m_audioStreamIndex]->time_base;
 	}
 
-	// ∑¢ÀÕ–≈∫≈£¨¥•∑¢ onStreamOpened_initVideo/Audio ≤€
+	// ÂèëÈÄÅ‰ø°Âè∑ÔºåËß¶Âèë onStreamOpened_initVideo/Audio ÊßΩ
 	emit streamOpened(vParams, aParams, vTimeBase, aTimeBase);
 
 
-	// --- Ω‚∞¸—≠ª∑ ---
+	// --- Ëß£ÂåÖÂæ™ÁéØ ---
 	while (m_isPulling) {
 		AVPacketPtr packet(av_packet_alloc());
 		if (!packet) {
-			emit errorOccurred("RtmpPuller: Failed to allocate AVPacket");
+			WRITE_LOG("RtmpPuller: Failed to allocate AVPacket.");
 			break;
 		}
 
-		// av_read_frame ª·±ª interruptCallback ÷–∂œ
+		// av_read_frame ‰ºöË¢´ interruptCallback ‰∏≠Êñ≠
 		int ret = av_read_frame(m_fmtCtx, packet.get());
 
 		if (ret < 0) {
@@ -263,13 +257,13 @@ void RtmpPuller::doPullingWork() {
 				WRITE_LOG("RtmpPuller: Pulling interrupted by user.");
 			}
 			else {
-				WRITE_LOG("RtmpPuller: av_read_frame error: %s", avErrorToString(ret).toStdString().c_str());
-				emit errorOccurred(QString("RtmpPuller: av_read_frame error: %1").arg(avErrorToString(ret)));
+				WRITE_LOG("RtmpPuller: av_read_frame error:");
+				//emit errorOccurred(QString("RtmpPuller: av_read_frame error: %1").arg(avErrorToString(ret)));
 			}
-			break; // ÕÀ≥ˆ—≠ª∑
+			break; // ÈÄÄÂá∫Âæ™ÁéØ
 		}
 
-		// Ω´∞¸∑≈»Î’˝»∑µƒƒ⁄≤ø∂”¡–
+		// Â∞ÜÂåÖÊîæÂÖ•Ê≠£Á°ÆÁöÑÂÜÖÈÉ®ÈòüÂàó
 		if (packet->stream_index == m_videoStreamIndex) {
 			m_videoPacketQueue->enqueue(std::move(packet));
 		}
@@ -277,23 +271,23 @@ void RtmpPuller::doPullingWork() {
 			m_audioPacketQueue->enqueue(std::move(packet));
 		}
 		else {
-			// ∂™∆˙∆‰À˚∞¸
+			// ‰∏¢ÂºÉÂÖ∂‰ªñÂåÖ
 		}
 	}
 
-	// --- —≠ª∑Ω· ¯ ---
+	// --- Âæ™ÁéØÁªìÊùü ---
 	m_isPulling = false;
 
-	// »∑±£‘⁄ÕÀ≥ˆ«∞«Â¿Ì Demuxer ◊ ‘¥
+	// Á°Æ‰øùÂú®ÈÄÄÂá∫ÂâçÊ∏ÖÁêÜ Demuxer ËµÑÊ∫ê
 	if (m_fmtCtx) {
 		avformat_close_input(&m_fmtCtx);
 		m_fmtCtx = nullptr;
 	}
 
-	// ¥•∑¢◊”œﬂ≥ÃÕ£÷π (Õ®π˝«Âø’∂”¡–)
+	// Ëß¶ÂèëÂ≠êÁ∫øÁ®ãÂÅúÊ≠¢ (ÈÄöËøáÊ∏ÖÁ©∫ÈòüÂàó)
 	m_videoPacketQueue->clear();
 	m_audioPacketQueue->clear();
 
-	emit streamFinished();
+	emit streamClosed();
 	WRITE_LOG("RtmpPuller (Demuxer) thread finished.");
 }
