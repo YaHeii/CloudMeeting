@@ -5,8 +5,8 @@
      QUEUE_DATA<AVPacketPtr>* m_AudiopacketQueue = nullptr;
  */
 
-#ifndef FFMPEGINPUT_H
-#define FFMPEGINPUT_H
+#ifndef CAPTURE_H
+#define CAPTURE_H
 #include <QObject>
 #include "AVSmartPtrs.h"
 #include "ThreadSafeQueue.h"
@@ -84,4 +84,4 @@ public slots:
 };
 
 
-#endif //FFMPEGINPUT_H
+#endif //CAPTURE_H

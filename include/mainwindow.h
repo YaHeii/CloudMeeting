@@ -16,13 +16,10 @@
 #include "RtmpPuller.h"
 #include "screen.h"
 
-QT_BEGIN_NAMESPACE
 
 namespace Ui {
     class MainWindow;
 }
-
-QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -87,7 +84,8 @@ private:
     QThread *m_webRTCPublisherThread;
 	QThread* m_rtmpPullerThread;
 
-    VideoWidget *m_videoWidget;
+    VideoWidget *m_videoLocalWidget;
+    VideoWidget *m_videoRemoteWidget;
 
     bool m_videoEncoderReady = false;
     bool m_audioEncoderReady = false;
@@ -97,10 +95,11 @@ private slots:
     void on_openAudio_clicked();
     void on_exitmeetBtn_clicked(); //暂时使用退出会议来关闭视频音频
     void on_createmeetBtn_clicked();
-	void on_LiveStreamBtn_clicked();
+	void on_LiveStreamingBtn_clicked();
 	void on_joinmeetBtn_clicked();
 
-    void onNewFrameAvailable();
+    void onNewLocalFrameAvailable();
+    void onNewRemoteFrameAvailable();
     void videoEncoderReady();
     void audioEncoderReady();
 

@@ -8,7 +8,7 @@
 
 RtmpPuller::RtmpPuller(QString rtmpPullerLink, 
 	QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue, 
-	QObject* parent = nullptr)
+	QObject* parent)
 	: QObject{parent}, m_rtmpPullerLink(rtmpPullerLink), m_MainQimageQueue(MainQimageQueue)
 {
 	m_videoPacketQueue = new QUEUE_DATA<AVPacketPtr>();

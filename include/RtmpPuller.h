@@ -1,24 +1,13 @@
-#ifndef SCREEN_H
-#define SCREEN_H
+#ifndef RTMPPULLER_H
+#define RTMPPULLER_H
 #include <QObject>
 #include <QString>
-#include <QObject>
-#include <QString>
-#include <QThread>
-#include <QMutex>
 #include <QWaitCondition>
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
-#include <libavformat/avformat.h>
 #include "RtmpAudioPlayer.h"
 #include "ffmpegVideoDecoder.h"
-#include "mainwindow.h"
-#include "ui_mainwindow.h"
-#include "logqueue.h"
-#include "log_global.h"
 #include "netheader.h"
-#include "screen.h"
-#include "DeviceEnumerator.h"
 #include <QMessageBox>
 #include "AudioResampleConfig.h"
 
@@ -26,6 +15,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
 #include <libavutil/imgutils.h>
+#include <libavformat/avformat.h>
 }
 class RtmpPuller : public QObject {
     Q_OBJECT
@@ -77,4 +67,4 @@ public slots:
                                   AVRational vTimeBase, AVRational aTimeBase);
 };
 
-#endif // SCREEN_H
+#endif // RTMPPULLER_H

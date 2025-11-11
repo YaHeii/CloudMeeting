@@ -27,14 +27,15 @@ MainWindow::MainWindow(QWidget *parent)
     Screen::init();
     MainWindow::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
 
-    m_videoWidget = ui->smallVideoDisplayWidget;
+    m_videoLocalWidget = ui->smallVideoDisplayWidget;
+    m_videoRemoteWidget = ui->mainVideoDisplayWidget;
 
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui->openVideo->setText(QString(OPENVIDEO).toUtf8());
 
-    this->setGeometry(MainWindow::pos);
-    this->setMinimumSize(QSize(MainWindow::pos.width() * 0.7, MainWindow::pos.height() * 0.7));
-    this->setMaximumSize(QSize(MainWindow::pos.width(), MainWindow::pos.height()));
+    this->setGeometry(this->pos);
+    this->setMinimumSize(QSize(this->pos.width() * 0.7, this->pos.height() * 0.7));
+    this->setMaximumSize(QSize(this->pos.width(), this->pos.height()));
 
     ui->exitmeetBtn->setDisabled(false);
     ui->joinmeetBtn->setDisabled(false);
@@ -106,7 +107,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_Capture, &Capture::deviceOpenSuccessfully, this, &MainWindow::onDeviceOpened);
 
     //// 视频
-    connect(m_videoDecoder, &ffmpegVideoDecoder::newFrameAvailable, this, &MainWindow::onNewFrameAvailable,
+    connect(m_videoDecoder, &ffmpegVideoDecoder::newFrameAvailable, this, &MainWindow::onNewLocalFrameAvailable,
             Qt::QueuedConnection);
 
     //// 音频
@@ -195,7 +196,7 @@ void MainWindow::on_openVideo_clicked() {
         // --- 更新UI和状态 ---
         ui->openVideo->setText("开启视频");
         m_isVideoRunning = false;
-        // m_videoWidget->updateFrame(nullptr);
+        // m_videoLocalWidget->updateFrame(nullptr);
         qDebug() << "Video stopped.";
     } else {
         QString videoDevice = ui->videoDeviceComboBox->currentText();
@@ -254,7 +255,7 @@ void MainWindow::on_joinmeetBtn_clicked() {
 }
 
 //// 开启直播按钮
-void MainWindow::on_LiveStreamBtn_clicked() {
+void MainWindow::on_LiveStreamingBtn_clicked() {
     qDebug() << "on_LiveStreamBtn_clicked";
     if (m_videoParams) {
         qDebug("Initializing video pipeline(H264)");
@@ -396,15 +397,26 @@ void MainWindow::videoEncoderReady() {
                               Q_ARG(bool, m_videoEncoderReady));
 }
 
-void MainWindow::onNewFrameAvailable() {
+void MainWindow::onNewLocalFrameAvailable() {
     // 这是在UI主线程中执行的
     std::unique_ptr<QImage> image;
     if (m_SmallQimageQueue->dequeue(image)) {
         if (image && !image->isNull()) {
-            m_videoWidget->updateFrame(image.get());
+            m_videoLocalWidget->updateFrame(image.get());
         }
     }
 }
+
+void MainWindow::onNewRemoteFrameAvailable() {
+    // 这是在UI主线程中执行的
+    std::unique_ptr<QImage> image;
+    if (m_MainQimageQueue->dequeue(image)) {
+        if (image && !image->isNull()) {
+            m_videoRemoteWidget->updateFrame(image.get());
+        }
+    }
+}
+
 
 void MainWindow::handleError(const QString &errorText) {
     WRITE_LOG(errorText.toLocal8Bit());

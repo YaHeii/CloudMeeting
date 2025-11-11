@@ -6,7 +6,7 @@
 
 bool ffmpegInputInitialized = false;
 
-Capture::Capture(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue, QObject* parent = nullptr) : QObject(parent) {
+Capture::Capture(QUEUE_DATA<AVPacketPtr>* videoQueue, QUEUE_DATA<AVPacketPtr>* audioQueue, QObject* parent) : QObject(parent) {
     initializeFFmpeg();
     m_videoPacketQueue = videoQueue;
     m_audioPacketQueue = audioQueue;
