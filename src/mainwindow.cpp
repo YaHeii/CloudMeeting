@@ -114,8 +114,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_audioEncoder, &ffmpegEncoder::audioEncoderReady, m_audioDecoder, &ffmpegAudioDecoder::setResampleConfig,
             Qt::QueuedConnection);
 
-	QString rtmpPullerLink = ui->meetnum->text().toStdString().c_str();
-	m_rtmpPuller = new RtmpPuller(rtmpPullerLink, m_MainQimageQueue);
+	// RTMP拉流
+    m_rtmpPullerThread = new QThread(this);
+	m_rtmpPuller = new RtmpPuller(m_MainQimageQueue);
+    m_rtmpPuller->moveToThread(m_rtmpPullerThread);
+    m_rtmpPullerThread->start();
 
 
     //errorOccurred处理
@@ -246,13 +249,6 @@ void MainWindow::on_openAudio_clicked() {
     }
 }
 
-void MainWindow::on_joinmeetBtn_clicked() {
-    qDebug() << "on_joinmeetBtn_clicked";
-    m_rtmpPublisherThread = new QThread(this);
-    m_rtmpPublisher = new RtmpPublisher(m_publishPacketQueue);
-    m_rtmpPublisher->moveToThread(m_rtmpPublisherThread);
-    m_rtmpPublisherThread->start();
-}
 
 //// 开启直播按钮
 void MainWindow::on_LiveStreamingBtn_clicked() {
@@ -354,6 +350,19 @@ void MainWindow::on_createmeetBtn_clicked() {
     else {
         ui->createmeetBtn->setEnabled(false);
     }
+}
+
+//// 加入房间按钮
+void MainWindow::on_joinmeetBtn_clicked() {
+    qDebug() << "on_joinmeetBtn_clicked";
+    WRITE_LOG("Joining meeting");
+    QString rtmpUrl = "rtmp://127.0.0.1:1935/live/teststream";
+    //QString rtmpUrl = ui->meetnum->text();
+    if (!rtmpUrl.isEmpty()) {
+        QMetaObject::invokeMethod(m_rtmpPuller, "init", Qt::QueuedConnection,
+                                  Q_ARG(QString, rtmpUrl));
+    }
+    QMetaObject::invokeMethod(m_rtmpPuller, "startPulling", Qt::QueuedConnection);
 }
 
 //// 退出会议按钮

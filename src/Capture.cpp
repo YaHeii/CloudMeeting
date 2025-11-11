@@ -110,7 +110,7 @@ void Capture::openDevice(const QString &videoDeviceName, const QString &audioDev
         AVCodecParameters *aParams = m_FormatCtx->streams[m_audioStreamIndex]->codecpar;
         m_isAudio = true;
         WRITE_LOG("Audio codec: %1", QString("Codec ID: %1").arg(aParams->codec_id));
-        // WRITE_LOG(QString("Audio channels: %1").arg(aParams->channels));
+        // WRITE_LOG(QString("Audio channels: %1").arg(m_aParams->channels));
     } else {
         WRITE_LOG("No audio stream found.");
     }

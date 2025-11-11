@@ -71,6 +71,8 @@ private:
     // --- 推流 ---
     WebRTCPublisher *m_webRTCPublisher; //WebRTC
     RtmpPublisher *m_rtmpPublisher; //RTMP
+
+    // --- 拉流 ---
     RtmpPuller *m_rtmpPuller; //RTMP拉流
 
 

@@ -21,17 +21,20 @@ class RtmpPuller : public QObject {
     Q_OBJECT
 
 public:
-    explicit RtmpPuller(QString rtmpPullerLink, QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue,QObject* parent = nullptr);
+    explicit RtmpPuller(QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue, QObject* parent = nullptr);
 
     ~RtmpPuller();
 
-    void startPulling();
+
     
     void stopPulling();
 private:
-    bool initialize();
-    void clear();
-    void doPullingWork();
+
+
+    AVCodecParameters* m_vParams = nullptr;
+    AVCodecParameters* m_aParams = nullptr;
+    AVRational m_vTimeBase = { 0, 1 };
+    AVRational m_aTimeBase = { 0, 1 };
 
     QUEUE_DATA<std::unique_ptr<QImage> >* m_MainQimageQueue;
     QUEUE_DATA<AVPacketPtr>* m_videoPacketQueue;
@@ -51,20 +54,28 @@ private:
     QThread* m_audioPlayThread = nullptr;
     RtmpAudioPlayer* m_audioPlayer = nullptr;
 
+    // --- 线程同步 ---
+    QMutex m_workMutex;
+    QWaitCondition m_workCond;
+    bool m_isDoingWork = false;
+
 signals:
     void errorOccurred(const QString& errorText);
-    void streamOpened(AVCodecParameters* vParams, AVCodecParameters* aParams,
-        AVRational vTimeBase, AVRational aTimeBase);
+    void VideostreamOpened(AVCodecParameters* vParams, AVRational vTimeBase);
+	void AudiostreamOpened(AVCodecParameters* aParams, AVRational aTimeBase);
     void streamClosed();
 
 public slots:
+    bool init(QString RtmpUrl);
+    void clear();
+    void startPulling();
+    void doPullingWork();
+
 	void ChangePullingState(bool isDecoding);
 
-    void onStreamOpened_initVideo(AVCodecParameters* vParams, AVCodecParameters* aParams, 
-                                  AVRational vTimeBase, AVRational aTimeBase);
+    void onStreamOpened_initVideo(AVCodecParameters* vParams, AVRational vTimeBase);
 
-    void onStreamOpened_initAudio(AVCodecParameters* vParams, AVCodecParameters* aParams, 
-                                  AVRational vTimeBase, AVRational aTimeBase);
+    void onStreamOpened_initAudio(AVCodecParameters* aParams, AVRational aTimeBase);
 };
 
 #endif // RTMPPULLER_H

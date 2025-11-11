@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(CloudMeeting LANGUAGES CXX)
-
+if (MSVC)
+    # /FS 标志解决 PDB 文件并行写入冲突
+    add_compile_options(/FS)
+endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -59,7 +62,7 @@ add_executable(CloudMeeting
         include/RtmpPuller.h
 
 )
-target_compile_options(CloudMeeting PRIVATE /FS)
+
 set_target_properties(CloudMeeting PROPERTIES
     AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/ui"
 )
