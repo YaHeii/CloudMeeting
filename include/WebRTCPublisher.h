@@ -47,7 +47,6 @@ private:
     QString m_signalingUrl;
     QString m_streamUrl;
 
-    std::string cleanupSdp(const std::string& originalSdp);
 signals:
     void errorOccurred(const QString &errorText);
 
@@ -63,8 +62,6 @@ public slots:
     void stopPublishing();
 
     void clear();
-
-    void initThread();
 
 private slots:
     void doPublishingWork();

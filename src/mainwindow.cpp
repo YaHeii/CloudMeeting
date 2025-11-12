@@ -338,9 +338,15 @@ void MainWindow::on_createmeetBtn_clicked() {
         }
 
         ////WebRTC链接实现
-        QString webRTCsignalingUrl = "http://10.0.0.10:1985/rtc/v1/publish/";
-        QString webRTCstreamUrl = "webrtc://10.0.0.10:8000/live/tsetstream"; 
-
+        //QString webRTCsignalingUrl = "http://10.0.0.10:1985/rtc/v1/publish/";
+        //QString webRTCstreamUrl = "webrtc://10.0.0.10:8000/live/tsetstream"; 
+        QString srsServerUrl = "http://localhost:1985";
+        //QString srsServerUrl = ui->serverUrl->text();
+        //QString srsServerPort = ui->port->text();
+        QString m_roomId = "roomID";
+        QString m_userId = "user";
+        QString webRTCsignalingUrl = srsServerUrl + "/rtc/v1/whip/?app=live&stream=" + m_roomId + "&eip=172.17.0.2";
+        QString webRTCstreamUrl = srsServerUrl + "/rtc/v1/whip/?app=live&stream=" + m_roomId;
         QMetaObject::invokeMethod(m_webRTCPublisher, "init", Qt::QueuedConnection,
                                   Q_ARG(QString, webRTCsignalingUrl),
                                   Q_ARG(QString, webRTCstreamUrl));
