@@ -15,8 +15,8 @@ RtmpPuller::RtmpPuller(QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue,
 	m_dummyVideoFrameQueue = new QUEUE_DATA<AVFramePtr>();
 
 	m_videoDecoder = new ffmpegVideoDecoder(m_videoPacketQueue,
-		m_MainQimageQueue, // 使用外部 QImage 队列
-		m_dummyVideoFrameQueue);
+											m_MainQimageQueue, // 使用外部 QImage 队列
+											m_dummyVideoFrameQueue);
 
 	m_audioPlayer = new RtmpAudioPlayer(m_audioPacketQueue);
 
@@ -34,7 +34,7 @@ RtmpPuller::RtmpPuller(QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue,
 	// 转发错误信号
 	connect(m_videoDecoder, &ffmpegVideoDecoder::errorOccurred, this, &RtmpPuller::errorOccurred);
 	connect(m_audioPlayer, &RtmpAudioPlayer::errorOccurred, this, &RtmpPuller::errorOccurred);
-
+	connect(m_videoDecoder, &ffmpegVideoDecoder::newFrameAvailable,this, &RtmpPuller::newFrameAvailable);
 	WRITE_LOG("RtmpPuller (Player Module) created.");
 }
 
@@ -51,13 +51,13 @@ void RtmpPuller::ChangePullingState(bool isPulling) {
 
 }
 
-bool RtmpPuller::init(QString RtmpUrl) {
+void RtmpPuller::init(QString RtmpUrl) {
 	m_fmtCtx = avformat_alloc_context();
 	if (!m_fmtCtx) {
 		emit errorOccurred("RtmpPuller: Failed to allocate AVFormatContext");
-		return false;
+		return;
 	}
-
+	m_rtmpPullerLink = RtmpUrl;
 	AVDictionary* opts = nullptr;
 	av_dict_set(&opts, "stimeout", "5000000", 0);
 	av_dict_set(&opts, "probesize", "4096", 0);
@@ -65,13 +65,13 @@ bool RtmpPuller::init(QString RtmpUrl) {
 	int ret = avformat_open_input(&m_fmtCtx, m_rtmpPullerLink.toStdString().c_str(), nullptr, &opts);
 	av_dict_free(&opts);
 	if (ret < 0) {
-		//emit errorOccurred(QString("RtmpPuller: Failed to open stream: %1").arg(avErrorToString(ret)));
-		return false;
+		emit errorOccurred("RtmpPuller: Failed to open stream");
+		return;
 	}
 
 	if (avformat_find_stream_info(m_fmtCtx, nullptr) < 0) {
 		emit errorOccurred("RtmpPuller: Failed to find stream info");
-		return false;
+		return;
 	}
 
 	m_videoStreamIndex = av_find_best_stream(m_fmtCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
@@ -79,12 +79,13 @@ bool RtmpPuller::init(QString RtmpUrl) {
 
 	if (m_videoStreamIndex < 0 && m_audioStreamIndex < 0) {
 		emit errorOccurred("RtmpPuller: No video or audio streams found.");
-		return false;
+		return;
 	}
 	if (m_videoStreamIndex >= 0) {
 		m_vParams = m_fmtCtx->streams[m_videoStreamIndex]->codecpar;
 		m_vTimeBase = m_fmtCtx->streams[m_videoStreamIndex]->time_base;
 		emit VideostreamOpened(m_vParams, m_vTimeBase);
+		WRITE_LOG("RtmpPuller: VideostreamOpened");
 	}
 	else {
         WRITE_LOG("RtmpPuller: No video stream found.");
@@ -93,12 +94,14 @@ bool RtmpPuller::init(QString RtmpUrl) {
 		m_aParams = m_fmtCtx->streams[m_audioStreamIndex]->codecpar;
 		m_aTimeBase = m_fmtCtx->streams[m_audioStreamIndex]->time_base;
 		emit AudiostreamOpened(m_aParams, m_aTimeBase);
+		WRITE_LOG("RtmpPuller: AudiostreamOpened");
 	}
 	else {
         WRITE_LOG("RtmpPuller: No audio stream found.");
 	}
 
-	return true;
+
+	emit initSuccess();
 }
 
 // 在 RtmpPuller (Demuxer) 线程中初始化解码器
@@ -144,21 +147,21 @@ void RtmpPuller::startPulling() {
 
 	if (m_isPulling) {
 		WRITE_LOG("RtmpPuller already pulling.");
-
 		return;
 	}
+	m_isPulling = true;
 	WRITE_LOG("RtmpPuller: Starting all threads...");
-
 	m_videoDecodeThread->start();
 	m_audioPlayThread->start();
-	
+
 	QMetaObject::invokeMethod(this, "doPullingWork", Qt::QueuedConnection);
 }
 
 void RtmpPuller::doPullingWork() {
+	WRITE_LOG("doPullingWork clicked");
+
 	if (!m_isPulling) {
 		WRITE_LOG("RtmpPuller: Stopping all threads...");
-		clear();
 		return;
 	}
 
@@ -179,10 +182,10 @@ void RtmpPuller::doPullingWork() {
 		m_isDoingWork = false;
 		m_workCond.wakeAll();
 	};
-
-	int ret = av_read_frame(m_fmtCtx, packet.get());
-
-	if (ret < 0) {
+	int ret = 0;
+	qDebug() << "start to read frame";
+	qDebug() << m_fmtCtx;
+	if (ret = av_read_frame(m_fmtCtx, packet.get()) < 0) {
 		if (ret == AVERROR_EOF) {
 			WRITE_LOG("RtmpPuller: End of stream.");
 		}
@@ -191,7 +194,7 @@ void RtmpPuller::doPullingWork() {
 		}
 		else {
 			WRITE_LOG("RtmpPuller: av_read_frame error:");
-			//emit errorOccurred(QString("RtmpPuller: av_read_frame error: %1").arg(avErrorToString(ret)));
+			emit errorOccurred("RtmpPuller: av_read_frame error: %1");
 		}
 
 	}
@@ -207,10 +210,9 @@ void RtmpPuller::doPullingWork() {
 		WRITE_LOG("RtmpPuller: Unknown stream index.");
 	}
 
-
 	work_guard();
 	if (m_isPulling) {
-		QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
+		QMetaObject::invokeMethod(this, "doPullingWork", Qt::QueuedConnection);
 	}
 
 }
@@ -219,19 +221,25 @@ void RtmpPuller::stopPulling() {
 	if (!m_isPulling) return;
 	WRITE_LOG("RtmpPuller: Stopping all threads...");
 
-	// 1. 设置标志，这将
 	m_isPulling = false;
+	if (m_fmtCtx) {
+		avformat_close_input(&m_fmtCtx);
+	}
 
-	// 2. 停止子线程的工作循环
-	//    (使用 QMetaObject::invokeMethod 确保在正确的线程中调用)
+	{
+		QMutexLocker locker(&m_workMutex);
+		while (m_isDoingWork) {
+			m_workCond.wait(&m_workMutex);
+		}
+	}
 	QMetaObject::invokeMethod(m_videoDecoder, "stopDecoding", Qt::BlockingQueuedConnection);
 	QMetaObject::invokeMethod(m_audioPlayer, "stopPlaying", Qt::BlockingQueuedConnection);
 
-	// 3. 清空队列，唤醒所有在 dequeue 上等待的线程
+	// 清空队列，唤醒所有在 dequeue 上等待的线程
 	m_videoPacketQueue->clear();
 	m_audioPacketQueue->clear();
 
-	// 4. 退出并等待子线程 QThread 结束
+	// 退出并等待子线程 QThread 结束
 	if (m_videoDecodeThread && m_videoDecodeThread->isRunning()) {
 		m_videoDecodeThread->quit();
 		m_videoDecodeThread->wait();
@@ -245,6 +253,7 @@ void RtmpPuller::stopPulling() {
 }
 
 void RtmpPuller::clear() {
+	stopPulling();
 	// 确保在退出前清理 Demuxer 资源
 	if (m_fmtCtx) {
 		avformat_close_input(&m_fmtCtx);
@@ -252,8 +261,6 @@ void RtmpPuller::clear() {
 	}
 
 	emit streamClosed();
-
-	stopPulling();
 
 	// 释放子线程和工作对象
 	delete m_videoDecodeThread;
@@ -265,6 +272,13 @@ void RtmpPuller::clear() {
 	m_videoDecoder = nullptr;
 	m_audioPlayThread = nullptr;
 	m_audioPlayer = nullptr;
+
+	delete m_videoPacketQueue;
+	delete m_audioPacketQueue;
+	delete m_dummyVideoFrameQueue;
+	m_videoPacketQueue = nullptr;
+	m_audioPacketQueue = nullptr;
+	m_dummyVideoFrameQueue = nullptr;
 
 	WRITE_LOG("RtmpPuller resources cleared.");
 }

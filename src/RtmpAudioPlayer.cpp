@@ -40,29 +40,29 @@ bool RtmpAudioPlayer::init(AVCodecParameters* params, AVRational inputTimeBase) 
 }
 
 bool RtmpAudioPlayer::initAudioOutput(AVFrame* frame) {
-    // �����ز����� (SwrContext)��Ŀ���ʽΪ QAudioSink ֧�ֵĸ�ʽ
 
-    // QAudioFormat �����ĸ�ʽ (���� S16LE)
+
+
     AVSampleFormat out_sample_fmt = AV_SAMPLE_FMT_S16;
     QAudioFormat::SampleFormat q_sample_format = QAudioFormat::Int16;
 
-    // Ŀ��ͨ������
-    AVChannelLayout out_ch_layout;
-    av_channel_layout_default(&out_ch_layout, 2); // ǿ��������
 
-    // Ŀ�������
+    AVChannelLayout out_ch_layout;
+    av_channel_layout_default(&out_ch_layout, 2); 
+
+
     int out_sample_rate = 48000;
 
-    // �ͷžɵ�
+ 
     if (m_swrCtx) swr_free(&m_swrCtx);
 
     swr_alloc_set_opts2(&m_swrCtx,
-        &out_ch_layout,      // Ŀ��
-        out_sample_fmt,      // Ŀ��
-        out_sample_rate,     // Ŀ��
-        &frame->ch_layout,   // Դ
-        (AVSampleFormat)frame->format, // Դ
-        frame->sample_rate,  // Դ
+        &out_ch_layout,      
+        out_sample_fmt,     
+        out_sample_rate,     
+        &frame->ch_layout,   
+        (AVSampleFormat)frame->format,
+        frame->sample_rate,  
         0, nullptr);
 
     if (!m_swrCtx || swr_init(m_swrCtx) < 0) {
@@ -84,10 +84,10 @@ bool RtmpAudioPlayer::initAudioOutput(AVFrame* frame) {
     const QAudioDevice& defaultDevice = QMediaDevices::defaultAudioOutput();
     m_audioSink = new QAudioSink(defaultDevice, format, this);
 
-    // (��ѡ) ���û�������С
+
     m_audioSink->setBufferSize(out_sample_rate * out_ch_layout.nb_channels * 2 * 0.5); // 0.5��
 
-    m_audioDevice = m_audioSink->start(); // ��ʼ���ţ���ȡ QIODevice
+    m_audioDevice = m_audioSink->start(); 
     if (!m_audioDevice) {
         emit errorOccurred("AudioPlayer: Failed to start QAudioSink.");
         return false;
@@ -106,7 +106,7 @@ void RtmpAudioPlayer::startPlaying() {
 
 void RtmpAudioPlayer::stopPlaying() {
     m_isDecoding = false;
-    // ʹ���� ffmpegVideoDecoder::clear() ��ͬ��ͬ������
+
     {
         QMutexLocker locker(&m_workMutex);
         while (m_isDoingWork) {
@@ -154,7 +154,7 @@ void RtmpAudioPlayer::doDecodingWork() {
         return;
     }
 
-    // �� (������ ffmpegVideoDecoder::doDecodingPacket)
+
     {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = true;
@@ -176,7 +176,7 @@ void RtmpAudioPlayer::doDecodingWork() {
         while (avcodec_receive_frame(m_codecCtx, decoded_frame.get()) == 0) {
             if (!m_isDecoding) break;
 
-            // 1. �״ν��յ�֡ʱ����ʼ�� QAudioSink �� SwrContext
+
             if (!m_audioSink) {
                 if (!initAudioOutput(decoded_frame.get())) {
                     m_isDecoding = false;
@@ -184,22 +184,37 @@ void RtmpAudioPlayer::doDecodingWork() {
                 }
             }
 
-            // 2. �����ز���������
-            // (���� ffmpegAudioDecoder::setResampleConfig ���߼�)
             int dst_nb_samples = av_rescale_rnd(decoded_frame->nb_samples,
                 m_audioSink->format().sampleRate(),
                 decoded_frame->sample_rate, AV_ROUND_UP);
 
             if (dst_nb_samples > m_resampledDataSize) {
-                av_freep(&m_resampledData[0]);
-                av_freep(&m_resampledData);
-                av_samples_alloc_array_and_samples(&m_resampledData, &m_resampledLinesize,
+
+                // 【修复】只有在 m_resampledData 之前被分配过的情况下才能释放
+                if (m_resampledData) {
+                    av_freep(&m_resampledData[0]); // 释放数据缓冲区
+                    av_freep(&m_resampledData);   // 释放指针数组
+                    // av_freep 已经将 m_resampledData 设置为 NULL
+                }
+
+                // 分配新内存
+                int ret = av_samples_alloc_array_and_samples(&m_resampledData, &m_resampledLinesize,
                     m_audioSink->format().channelCount(),
                     dst_nb_samples, AV_SAMPLE_FMT_S16, 0);
+
+                if (ret < 0) {
+                    // 内存分配失败
+                    emit errorOccurred("AudioPlayer: Failed to allocate resampled data buffer.");
+                    m_resampledDataSize = 0; // 重置大小
+                    m_resampledData = nullptr; // 确保指针为空
+                    break; // 退出内部循环
+                }
+
                 m_resampledDataSize = dst_nb_samples;
+                WRITE_LOG("AudioPlayer: Re-allocated resample buffer to size for %d samples.", dst_nb_samples);
             }
 
-            // 3. �ز���
+
             int samples_converted = swr_convert(m_swrCtx,
                 m_resampledData, dst_nb_samples,
                 (const uint8_t**)decoded_frame->data,
@@ -207,14 +222,13 @@ void RtmpAudioPlayer::doDecodingWork() {
 
             if (samples_converted <= 0) continue;
 
-            // 4. ���㻺������С��д�� QAudioSink
             int buffer_size = av_samples_get_buffer_size(&m_resampledLinesize,
                 m_audioSink->format().channelCount(),
                 samples_converted,
                 AV_SAMPLE_FMT_S16, 1);
 
             if (m_audioDevice) {
-                // (��ѡ) ��黺�������пռ䣬ʵ������Ƶͬ��
+
                 // int free_bytes = m_audioSink->bytesFree();
                 // while (free_bytes < buffer_size && m_isDecoding) {
                 //     QThread::msleep(10);

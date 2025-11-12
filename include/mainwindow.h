@@ -111,5 +111,10 @@ private slots:
     void handleError(const QString &errorText);
 
     void onDeviceOpened(AVCodecParameters* vParams, AVCodecParameters* aParams, AVRational vTimeBase, AVRational aTimeBase);
+
+    void onRtmpPullerInitSuccess() {
+        // 只有在 init 成功后，才启动拉流
+        QMetaObject::invokeMethod(m_rtmpPuller, "startPulling", Qt::QueuedConnection);
+    }
 };
 #endif // MAINWINDOW_H

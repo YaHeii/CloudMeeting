@@ -119,6 +119,7 @@ MainWindow::MainWindow(QWidget *parent)
 	m_rtmpPuller = new RtmpPuller(m_MainQimageQueue);
     m_rtmpPuller->moveToThread(m_rtmpPullerThread);
     m_rtmpPullerThread->start();
+    connect(m_rtmpPuller, &RtmpPuller::newFrameAvailable,this, &MainWindow::onNewRemoteFrameAvailable,Qt::QueuedConnection);
 
 
     //errorOccurred处理
@@ -128,7 +129,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_videoEncoder, &ffmpegEncoder::errorOccurred, this, &MainWindow::handleError);
     connect(m_Capture, &Capture::errorOccurred, this, &MainWindow::handleError);
     connect(m_webRTCPublisher, &WebRTCPublisher::errorOccurred, this, &MainWindow::handleError);
-
+    connect(m_rtmpPuller, &RtmpPuller::errorOccurred, this, &MainWindow::handleError);
     // 线程结束后，自动清理工作对象和线程本身
     connect(m_CaptureThread, &QThread::finished, m_Capture, &QObject::deleteLater);
     connect(m_videoDecoderThread, &QThread::finished, m_videoDecoder, &QObject::deleteLater);
@@ -157,6 +158,13 @@ MainWindow::~MainWindow() {
         QMetaObject::invokeMethod(m_videoDecoder, "stopDecoding", Qt::BlockingQueuedConnection);
         m_videoDecoderThread->quit();
         m_videoDecoderThread->wait();
+    }
+    // 停止RTMP
+    if (m_rtmpPullerThread && m_rtmpPullerThread->isRunning()) {
+        // 使用 BlockingQueuedConnection 确保 clear() 执行完毕
+        QMetaObject::invokeMethod(m_rtmpPuller, "clear", Qt::BlockingQueuedConnection);
+        m_rtmpPullerThread->quit();
+        m_rtmpPullerThread->wait();
     }
 
     // 清理队列，确保在其他对象销毁前清理队列以避免wakeAll崩溃
@@ -340,12 +348,12 @@ void MainWindow::on_createmeetBtn_clicked() {
         ////WebRTC链接实现
         //QString webRTCsignalingUrl = "http://10.0.0.10:1985/rtc/v1/publish/";
         //QString webRTCstreamUrl = "webrtc://10.0.0.10:8000/live/tsetstream"; 
-        QString srsServerUrl = "http://localhost:1985";
+        QString srsServerUrl = "http://10.0.0.10:1985";
         //QString srsServerUrl = ui->serverUrl->text();
         //QString srsServerPort = ui->port->text();
         QString m_roomId = "roomID";
         QString m_userId = "user";
-        QString webRTCsignalingUrl = srsServerUrl + "/rtc/v1/whip/?app=live&stream=" + m_roomId + "&eip=172.17.0.2";
+        QString webRTCsignalingUrl = srsServerUrl + "/rtc/v1/whip/?app=live&stream=" + m_roomId;
         QString webRTCstreamUrl = srsServerUrl + "/rtc/v1/whip/?app=live&stream=" + m_roomId;
         QMetaObject::invokeMethod(m_webRTCPublisher, "init", Qt::QueuedConnection,
                                   Q_ARG(QString, webRTCsignalingUrl),
@@ -368,7 +376,8 @@ void MainWindow::on_joinmeetBtn_clicked() {
         QMetaObject::invokeMethod(m_rtmpPuller, "init", Qt::QueuedConnection,
                                   Q_ARG(QString, rtmpUrl));
     }
-    QMetaObject::invokeMethod(m_rtmpPuller, "startPulling", Qt::QueuedConnection);
+    connect(m_rtmpPuller, &RtmpPuller::initSuccess, this, &MainWindow::onRtmpPullerInitSuccess);
+    //QMetaObject::invokeMethod(m_rtmpPuller, "startPulling", Qt::QueuedConnection);
 }
 
 //// 退出会议按钮
@@ -423,7 +432,7 @@ void MainWindow::onNewLocalFrameAvailable() {
 }
 
 void MainWindow::onNewRemoteFrameAvailable() {
-    // 这是在UI主线程中执行的
+
     std::unique_ptr<QImage> image;
     if (m_MainQimageQueue->dequeue(image)) {
         if (image && !image->isNull()) {

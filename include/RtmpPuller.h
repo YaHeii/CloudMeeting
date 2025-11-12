@@ -64,9 +64,10 @@ signals:
     void VideostreamOpened(AVCodecParameters* vParams, AVRational vTimeBase);
 	void AudiostreamOpened(AVCodecParameters* aParams, AVRational aTimeBase);
     void streamClosed();
-
+    void newFrameAvailable();
+    void initSuccess();
 public slots:
-    bool init(QString RtmpUrl);
+    void init(QString RtmpUrl);
     void clear();
     void startPulling();
     void doPullingWork();

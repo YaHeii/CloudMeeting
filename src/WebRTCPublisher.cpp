@@ -288,21 +288,6 @@ void WebRTCPublisher::onSignalingReply(QNetworkReply *response) {
         emit errorOccurred(QString("WHIP failed: HTTP %1").arg(httpStatus));
     }
     
-	////解析JSON
- //   QJsonParseError parseError;
- //   QJsonDocument jsonDoc = QJsonDocument::fromJson(response_data, &parseError);
- //   if (parseError.error != QJsonParseError::NoError) {
- //       QString error = QString("Failed to parse JSON response: %1").arg(parseError.errorString());
- //       WRITE_LOG(error.toStdString().c_str());
- //       response->deleteLater();
- //       emit errorOccurred(error);
- //       return;
- //   }
-
- //   QJsonObject jsonObj = jsonDoc.object();
- //   std::string sdpAnswer = jsonObj["sdp"].toString().toStdString();
- //   WRITE_LOG("Successfully received Answer SDP from server, length: %d", sdpAnswer.length());
- //   WRITE_LOG("Remote SDP Answer:\n%s", sdpAnswer.c_str());
 
     // 设置远端SDP描述
     try {
@@ -321,8 +306,12 @@ void WebRTCPublisher::onSignalingReply(QNetworkReply *response) {
         emit errorOccurred(error);
     }
 
+    QTimer::singleShot(30000, [response]() { // 30秒后删除
+        if (response) {
+            response->deleteLater();
+        }
+    });
 
-    response->deleteLater();
 }
 
 void WebRTCPublisher::doPublishingWork() {
