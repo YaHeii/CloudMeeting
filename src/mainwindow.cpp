@@ -348,7 +348,7 @@ void MainWindow::on_createmeetBtn_clicked() {
         ////WebRTC链接实现
         //QString webRTCsignalingUrl = "http://10.0.0.10:1985/rtc/v1/publish/";
         //QString webRTCstreamUrl = "webrtc://10.0.0.10:8000/live/tsetstream"; 
-        QString srsServerUrl = "http://10.0.0.10:1985";
+        QString srsServerUrl = "http://172.24.73.45:1985";
         //QString srsServerUrl = ui->serverUrl->text();
         //QString srsServerPort = ui->port->text();
         QString m_roomId = "roomID";
