@@ -94,6 +94,9 @@ private:
     bool m_videoEncoderReady = false;
     bool m_audioEncoderReady = false;
 
+    bool m_isRtmpPublishRequested = false;
+    bool m_isWebRtcPublishRequested = false;
+
 private slots:
     void on_openVideo_clicked();
     void on_openAudio_clicked();
@@ -122,5 +125,6 @@ private slots:
         WRITE_LOG("MainWindow recieve webrtcPublisher PLI signal");
         QMetaObject::invokeMethod(m_videoEncoder, "requestKeyFrame", Qt::QueuedConnection);
     }
+    void checkAndStartPublishing();//用于在编码器就绪启动推流
 };
 #endif // MAINWINDOW_H
