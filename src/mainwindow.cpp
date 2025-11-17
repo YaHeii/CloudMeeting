@@ -255,6 +255,8 @@ void MainWindow::on_openAudio_clicked() {
 //// 开启直播按钮
 void MainWindow::on_LiveStreamingBtn_clicked() {
     qDebug() << "on_LiveStreamBtn_clicked";
+    ui->LiveStreamingBtn->setEnabled(false);
+    ui->createmeetBtn->setEnabled(false);
     if (m_videoParams) {
         qDebug("Initializing video pipeline(H264)");
         QMetaObject::invokeMethod(m_videoEncoder, "initVideoEncoderH264", Qt::QueuedConnection,
@@ -347,8 +349,10 @@ void MainWindow::on_createmeetBtn_clicked() {
         //QString srsServerPort = ui->port->text();
         QString m_roomId = "roomID";
         QString m_userId = "user";
-        QString webRTCsignalingUrl = srsServerUrl + "/rtc/v1/whip/?app=live&stream=" + m_roomId;
-        QString webRTCstreamUrl = srsServerUrl + "/rtc/v1/whip/?app=live&stream=" + m_roomId;
+   /*     QString webRTCsignalingUrl = srsServerUrl + "/rtc/v1/whip/?app=live&stream=" + m_roomId;
+        QString webRTCstreamUrl = srsServerUrl + "/rtc/v1/whip/?app=live&stream=" + m_roomId;*/
+        QString webRTCsignalingUrl = "http://localhost:1985/rtc/v1/whip/?app=live&stream=livestream";
+        QString webRTCstreamUrl = "http://localhost:1985/rtc/v1/whip/?app=live&stream=livestream";
         QMetaObject::invokeMethod(m_webRTCPublisher, "init", Qt::QueuedConnection,
                                   Q_ARG(QString, webRTCsignalingUrl),
                                   Q_ARG(QString, webRTCstreamUrl));

@@ -70,7 +70,7 @@ bool RtmpAudioPlayer::initAudioOutput(AVFrame* frame) {
         return false;
     }
 
-    // ��ʼ�� QAudioSink
+    // QAudioSink
     if (m_audioSink) {
         m_audioSink->stop();
         delete m_audioSink;

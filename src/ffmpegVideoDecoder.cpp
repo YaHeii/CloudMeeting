@@ -45,9 +45,10 @@ bool ffmpegVideoDecoder::init(AVCodecParameters *params, AVRational inputTimeBas
     m_frameBasePts = AV_NOPTS_VALUE;
 
     WRITE_LOG("Video decoder initialized successfully.");
+    m_inputTimeBase = inputTimeBase;
     return true;
 
-	m_inputTimeBase = inputTimeBase;
+
 }
 
 void ffmpegVideoDecoder::startDecoding() {
@@ -75,6 +76,7 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         WRITE_LOG("Video decoding loop finished.");
         return;
     }
+    qDebug() << "isDecoding frame";
     AVPacketPtr packet;
     if (!m_packetQueue->dequeue(packet)) {
         if (m_isDecoding) {
@@ -97,98 +99,100 @@ void ffmpegVideoDecoder::doDecodingPacket() {
     if (!decodedFrame) {
         WRITE_LOG("Failed to allocate decoded_frame.");
         m_isDecoding = false;
+        work_guard();
         return;
     }
     if (avcodec_send_packet(m_codecCtx, packet.get()) != 0) {
         WRITE_LOG("Failed to send packet to decoder.");
+        work_guard();
         if (m_isDecoding) {
             QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
         }
         return;
     }
-    while (m_isDecoding) {
-        int ret = avcodec_receive_frame(m_codecCtx, decodedFrame.get());
 
-        if (ret < 0) {
-             //EAGAIN 或 EOF 表示这个包已经处理完了，可以跳出内层循环
-            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-                break;
-            }
-            WRITE_LOG("avcodec_receive_frame failed.");
-            break;
+    int ret = avcodec_receive_frame(m_codecCtx, decodedFrame.get());
+
+    if (ret < 0) {
+            //EAGAIN 或 EOF 表示这个包已经处理完了，可以跳出内层循环
+        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+            return;
         }
-
-        if (m_frameBasePts == AV_NOPTS_VALUE && decodedFrame->pts != AV_NOPTS_VALUE) {
-            m_frameBasePts = decodedFrame->pts;
-        }
-
-        AVFramePtr sendFrame(av_frame_clone(decodedFrame.get()));
-        if (decodedFrame->pts != AV_NOPTS_VALUE) {
-             //将输入PTS转换为帧序号（假设编码器用帧序号）
-            int64_t pts_in_frames = av_rescale_q(
-                decodedFrame->pts - m_frameBasePts,
-                m_inputTimeBase,
-                { 1, 25 }  // 假设25fps
-            );
-            sendFrame->pts = pts_in_frames;
-        }
-        else {
-            sendFrame->pts = AV_NOPTS_VALUE;
-        }
-        if(m_isEncoding){
-            m_frameQueue->enqueue(std::move(sendFrame));
-        }
-
-
-        bool formatChanged = (m_swsSrcWidth != m_codecCtx->width ||
-                              m_swsSrcHeight != m_codecCtx->height ||
-                              m_swsSrcPixFmt != m_codecCtx->pix_fmt);
-        if (!m_swsCtx || formatChanged) {
-            WRITE_LOG("Re-initializing SwsContext due to format change.");
-            //释放旧资源
-            sws_freeContext(m_swsCtx);
-            av_free(rgbBuffer);
-            rgbBuffer = nullptr;
-
-            // 更新参数记录
-            m_swsSrcWidth = m_codecCtx->width;
-            m_swsSrcHeight = m_codecCtx->height;
-            m_swsSrcPixFmt = m_codecCtx->pix_fmt;
-
-            m_swsCtx = sws_getContext(m_swsSrcWidth, m_swsSrcHeight, m_swsSrcPixFmt,
-                                      m_swsSrcWidth, m_swsSrcHeight, AV_PIX_FMT_RGB24,
-                                      SWS_BILINEAR, nullptr, nullptr, nullptr);
-
-            if (m_swsCtx) {
-                int bufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, m_swsSrcWidth, m_swsSrcHeight,1);
-                rgbBuffer = (uint8_t *) av_malloc(bufferSize * sizeof(uint8_t));
-                av_image_fill_arrays(m_rgbFrame->data, m_rgbFrame->linesize, rgbBuffer, AV_PIX_FMT_RGB24,
-                                     m_swsSrcWidth, m_swsSrcHeight,1);
-            } else {
-                WRITE_LOG("FATAL: Failed to create SwsContext.");
-                // 如果SwsContext创建失败，后续的转换也无法进行，可以跳出循环
-                break;
-            }
-        }
-        if (m_swsCtx) {
-            if (!decodedFrame || !decodedFrame->data[0]) {
-                WRITE_LOG("Error: Attempting to scale a NULL or invalid frame!");
-                break; // 跳过这一帧的处理
-            }
-            sws_scale(m_swsCtx, (const uint8_t * const*) decodedFrame->data, decodedFrame->linesize,
-                      0, m_codecCtx->height, m_rgbFrame->data, m_rgbFrame->linesize);
-
-            QImage tempImage(m_rgbFrame->data[0], m_codecCtx->width, m_codecCtx->height, QImage::Format_RGB888);
-            auto image = std::make_unique<QImage>(tempImage.copy()); //copy做深拷贝
-            m_QimageQueue->enqueue(std::move(image)); //添加到图片队列，用于QT渲染
-
-             //通知UI线程有新帧可用
-            emit newFrameAvailable();
-            //WRITE_LOG("NewFrameAvailable");
-			qDebug() << "NewFrameAvailable";
-        }
-        av_frame_unref(decodedFrame.get());
+        WRITE_LOG("avcodec_receive_frame failed.");
+        return;
     }
+
+    if (m_frameBasePts == AV_NOPTS_VALUE && decodedFrame->pts != AV_NOPTS_VALUE) {
+        m_frameBasePts = decodedFrame->pts;
+    }
+
+    AVFramePtr sendFrame(av_frame_clone(decodedFrame.get()));
+    if (decodedFrame->pts != AV_NOPTS_VALUE) {
+            //将输入PTS转换为帧序号（假设编码器用帧序号）
+        int64_t pts_in_frames = av_rescale_q(
+            decodedFrame->pts - m_frameBasePts,
+            m_inputTimeBase,
+            { 1, 25 }  // 假设25fps
+        );
+        sendFrame->pts = pts_in_frames;
+    }
+    else {
+        sendFrame->pts = AV_NOPTS_VALUE;
+    }
+    if(m_isEncoding){
+        m_frameQueue->enqueue(std::move(sendFrame));
+    }
+
+
+    bool formatChanged = (m_swsSrcWidth != m_codecCtx->width ||
+                            m_swsSrcHeight != m_codecCtx->height ||
+                            m_swsSrcPixFmt != m_codecCtx->pix_fmt);
+    if (!m_swsCtx || formatChanged) {
+        WRITE_LOG("Re-initializing SwsContext due to format change.");
+        //释放旧资源
+        sws_freeContext(m_swsCtx);
+        av_free(rgbBuffer);
+        rgbBuffer = nullptr;
+
+        // 更新参数记录
+        m_swsSrcWidth = m_codecCtx->width;
+        m_swsSrcHeight = m_codecCtx->height;
+        m_swsSrcPixFmt = m_codecCtx->pix_fmt;
+
+        m_swsCtx = sws_getContext(m_swsSrcWidth, m_swsSrcHeight, m_swsSrcPixFmt,
+                                    m_swsSrcWidth, m_swsSrcHeight, AV_PIX_FMT_RGB24,
+                                    SWS_BILINEAR, nullptr, nullptr, nullptr);
+
+        if (m_swsCtx) {
+            int bufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, m_swsSrcWidth, m_swsSrcHeight,1);
+            rgbBuffer = (uint8_t *) av_malloc(bufferSize * sizeof(uint8_t));
+            av_image_fill_arrays(m_rgbFrame->data, m_rgbFrame->linesize, rgbBuffer, AV_PIX_FMT_RGB24,
+                                    m_swsSrcWidth, m_swsSrcHeight,1);
+        } else {
+            WRITE_LOG("FATAL: Failed to create SwsContext.");
+            // 如果SwsContext创建失败，后续的转换也无法进行，可以跳出循环
+            return;
+        }
+    }
+    if (m_swsCtx) {
+        if (!decodedFrame || !decodedFrame->data[0]) {
+            WRITE_LOG("Error: Attempting to scale a NULL or invalid frame!");
+            return; // 跳过这一帧的处理
+        }
+        sws_scale(m_swsCtx, (const uint8_t * const*) decodedFrame->data, decodedFrame->linesize,
+                    0, m_codecCtx->height, m_rgbFrame->data, m_rgbFrame->linesize);
+
+        QImage tempImage(m_rgbFrame->data[0], m_codecCtx->width, m_codecCtx->height, QImage::Format_RGB888);
+        auto image = std::make_unique<QImage>(tempImage.copy()); //copy做深拷贝
+        m_QimageQueue->enqueue(std::move(image)); //添加到图片队列，用于QT渲染
+
+            //通知UI线程有新帧可用
+        emit newFrameAvailable();
+        //WRITE_LOG("NewFrameAvailable");
+		qDebug() << "NewFrameAvailable";
+    }
+    av_frame_unref(decodedFrame.get());
+
     work_guard();
     if (m_isDecoding) {
         QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
