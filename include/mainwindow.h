@@ -14,7 +14,9 @@
 #include "RtmpPublisher.h"
 #include "WebRTCPublisher.h"
 #include "RtmpPuller.h"
+ 
 #include "screen.h"
+
 
 
 namespace Ui {
@@ -74,7 +76,7 @@ private:
 
     // --- 拉流 ---
     RtmpPuller *m_rtmpPuller; //RTMP拉流
-
+    
 
 
     // --- 线程 ---
@@ -115,6 +117,10 @@ private slots:
     void onRtmpPullerInitSuccess() {
         // 只有在 init 成功后，才启动拉流
         QMetaObject::invokeMethod(m_rtmpPuller, "startPulling", Qt::QueuedConnection);
+    }
+    void on_PLIReceived_webrtcPublisher() {
+        WRITE_LOG("MainWindow recieve webrtcPublisher PLI signal");
+        QMetaObject::invokeMethod(m_videoEncoder, "requestKeyFrame", Qt::QueuedConnection);
     }
 };
 #endif // MAINWINDOW_H

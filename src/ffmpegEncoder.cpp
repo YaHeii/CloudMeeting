@@ -146,18 +146,38 @@ bool ffmpegEncoder::initVideoEncoderH264(AVCodecParameters *vparams) {
     m_codecCtx->framerate = {25,1};
     m_codecCtx->bit_rate =2000000; //2 Mbps
     m_codecCtx->gop_size =25;
-    m_codecCtx->max_b_frames =1;
-    av_opt_set(m_codecCtx->priv_data, "preset", "ultrafast",0);
-    av_opt_set(m_codecCtx->priv_data, "tune", "zerolatency",0);
-    m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // 全局头
-    if (avcodec_open2(m_codecCtx, codec, nullptr) <0) {
+    m_codecCtx->max_b_frames = 0;//不设置B帧
+    m_codecCtx->has_b_frames = 0;
+
+    m_codecCtx->level = 31; // Level 3.1
+    m_codecCtx->refs = 1;   // 参考帧数
+
+    // 设置编码器参数
+    AVDictionary* codec_options = nullptr;
+    av_dict_set(&codec_options, "preset", "ultrafast", 0);
+    av_dict_set(&codec_options, "tune", "zerolatency", 0);
+    av_dict_set(&codec_options, "profile", "baseline", 0);
+
+    // 关键：确保输出格式符合WebRTC要求
+    av_dict_set(&codec_options, "x264-params", "annexb=0:aud=1", 0); // AVCC格式，带AUD
+    av_dict_set(&codec_options, "bsf", "h264_mp4toannexb", 0); // 转换为annexb格式
+
+
+
+    //av_opt_set(m_codecCtx->priv_data, "preset", "ultrafast",0);
+    //av_opt_set(m_codecCtx->priv_data, "tune", "zerolatency",0);
+    //m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // 全局头
+
+
+    if (avcodec_open2(m_codecCtx, codec, &codec_options) <0) {
         emit errorOccurred("Failed to open video codec.");
+        av_dict_free(&codec_options);
         return false;
     }
 
     // reset video frame counter
     m_videoFrameCounter =0;
-
+    av_dict_free(&codec_options);
     emit encoderInitialized(m_codecCtx);
     emit initializationSuccess();
     WRITE_LOG("Video encoder initialized successfully.");
@@ -190,6 +210,13 @@ void ffmpegEncoder::doEncodingWork() { {
         // Assign PTS if missing and update internal counters
         if (m_mediaType == AVMEDIA_TYPE_VIDEO) {          
             frame->pts = m_videoFrameCounter++;
+            if (m_forceKeyframe.exchange(false)) { // 获取并重置标志
+                WRITE_LOG("reset the fram to I frame");
+                frame->pict_type = AV_PICTURE_TYPE_I; //强制此帧为I帧
+            }
+            else {
+                frame->pict_type = AV_PICTURE_TYPE_NONE; //让编码器自行决定
+            }
         } else if (m_mediaType == AVMEDIA_TYPE_AUDIO) {
             frame->pts = m_audioSamplesCount;
             m_audioSamplesCount += frame->nb_samples;
@@ -266,4 +293,9 @@ void ffmpegEncoder::clear() {
         m_codecCtx = nullptr;
     }
     WRITE_LOG("ffmpegEncoder cleared.");
+}
+
+void ffmpegEncoder::requestKeyFrame() {
+    m_forceKeyframe = true;
+    WRITE_LOG("Keyframe requested!");
 }

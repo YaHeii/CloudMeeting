@@ -1,12 +1,5 @@
 ﻿#include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "logqueue.h"
-#include "log_global.h"
-#include "netheader.h"
-#include "screen.h"
-#include "DeviceEnumerator.h"
-#include <QMessageBox>
-#include "AudioResampleConfig.h"
 
 QRect MainWindow::pos = QRect(-1, -1, -1, -1);
 
@@ -96,6 +89,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_webRTCPublisher->moveToThread(m_webRTCPublisherThread);
     m_webRTCPublisherThread->start();
     QMetaObject::invokeMethod(m_webRTCPublisher, "initThread", Qt::QueuedConnection);// 为了初始化libdatachannel
+    connect(m_webRTCPublisher, &WebRTCPublisher::PLIReceived, this, &MainWindow::on_PLIReceived_webrtcPublisher, Qt::QueuedConnection);
 
     //获取可用设备
     QStringList videoDevices = DeviceEnumerator::getDevices(MediaType::Video);

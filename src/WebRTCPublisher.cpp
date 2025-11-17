@@ -68,6 +68,9 @@ void WebRTCPublisher::initializePeerConnection() {
         video.addSSRC(42, "video-send", "video-stream", "video-track");
         video.setDirection(rtc::Description::Direction::SendOnly);
         m_videoTrack = m_peerConnection->addTrack(video);
+        //m_videoTrack->onPli([this]() {
+        //    this->onPLI_Received(); // 确保这个绑定被执行了
+        //    });
         WRITE_LOG("Video track (H.264) added.");
 
 
@@ -134,6 +137,7 @@ void WebRTCPublisher::initializePeerConnection() {
 
                 if (state == rtc::PeerConnection::State::Connected) {
                     emit publisherStarted();
+                    onPLI_Received();
                 } else if (state == rtc::PeerConnection::State::Failed) {
                     emit errorOccurred("WebRTC connection failed.");
                     stopPublishing();
@@ -357,4 +361,10 @@ void WebRTCPublisher::clear() {
     m_audioTrack.reset();
 
     WRITE_LOG("WebRTCPublisher cleared.");
+}
+
+void WebRTCPublisher::onPLI_Received() {
+    WRITE_LOG("Libdatachannel onPLI callback!");
+    // 跨线程安全地调用这个槽
+    emit PLIReceived();
 }

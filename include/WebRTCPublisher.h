@@ -8,9 +8,17 @@
 #include <QNetworkReply>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QMessageBox>
 
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
+#include "logqueue.h"
+#include "log_global.h"
+#include "netheader.h"
+#include "screen.h"
+#include "DeviceEnumerator.h"
+
+#include "AudioResampleConfig.h"
 
 #include <rtc/peerconnection.hpp>
 #include <rtc/track.hpp>
@@ -53,6 +61,7 @@ signals:
     void publisherStarted();
 
     void publisherStopped();
+    void PLIReceived();
 
 public slots:
     bool init(const QString &signalingUrl, const QString &streamUrl);
@@ -62,6 +71,8 @@ public slots:
     void stopPublishing();
 
     void clear();
+
+    void onPLI_Received();
 
 private slots:
     void doPublishingWork();

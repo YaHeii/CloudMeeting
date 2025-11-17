@@ -1,0 +1,103 @@
+srs日志
+[2025-11-14 14:27:53.736][INFO][931][j33j8ek0] SRS: cpu=1.00%,19MB, cid=1,0, timer=62,0,0, clock=0,43,4,0,0,0,0,0,0
+[2025-11-14 14:27:54.044][INFO][931][u10e092v] HTTP #0 172.24.64.1:63968 POST http://172.24.73.45:1985/rtc/v1/whip/?app=live&stream=roomID, content-length=1123
+[2025-11-14 14:27:54.044][INFO][931][u10e092v] RTC whip publish /live/roomID, clientip=172.24.64.1, app=live, stream=roomID, offer=1123B, eip=, vcodec=, acodec=, srtp=, dtls=, ufrag=, pwd=, param=app=live&stream=roomID
+[2025-11-14 14:27:54.044][INFO][931][u10e092v] stream publish token acquired, type=rtc, url=/live/roomID
+[2025-11-14 14:27:54.044][INFO][931][u10e092v] new rtc source, stream_url=/live/roomID
+[2025-11-14 14:27:54.045][INFO][931][u10e092v] RTC publisher nack=1, nnc=1, pt-drop=0, twcc=0/0
+[2025-11-14 14:27:54.045][INFO][931][u10e092v] free rtc source id=[]
+[2025-11-14 14:27:54.045][INFO][931][u10e092v] new live source, stream_url=/live/roomID
+[2025-11-14 14:27:54.045][INFO][931][u10e092v] RTC: Init tracks {track: video-track, is_active: 0=>1},{track: audio-track, is_active: 0=>1}, ok
+[2025-11-14 14:27:54.046][INFO][931][u10e092v] RTC: Use candidates 10.0.0.7, 172.24.73.45, protocol=udp, tcp_port=8000, udp_port=8000
+[2025-11-14 14:27:54.051][INFO][931][u10e092v] RTC init session, user=v9671l24:59N/, url=/live/roomID, encrypt=1/1, DTLS(role=passive, version=auto), timeout=30000ms, nack=1
+[2025-11-14 14:27:54.051][INFO][931][u10e092v] RTC username=v9671l24:59N/, offer=1123B, answer=1344B
+[2025-11-14 14:27:54.051][INFO][931][u10e092v] RTC remote offer: v=0\r\no=rtc 2034761426 0 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE video audio\r\na=group:LS video audio\r\na=msid-semantic:WMS *\r\na=ice-options:ice2,trickle\r\na=fingerprint:sha-256 33:C2:74:77:12:7C:34:02:F4:A7:31:31:66:57:42:5E:BF:7A:C9:C0:DC:B7:13:FB:A3:36:4F:FE:70:68:2F:A1\r\nm=video 9 UDP/TLS/RTP/SAVPF 96 97\r\nc=IN IP4 0.0.0.0\r\na=mid:video\r\na=sendonly\r\na=ssrc:42 cname:video-send\r\na=ssrc:42 msid:video-stream video-track\r\na=msid:video-stream video-track\r\na=rtcp-mux\r\na=rtpmap:96 H264/90000\r\na=rtcp-fb:96 nack\r\na=rtcp-fb:96 nack pli\r\na=rtcp-fb:96 goog-remb\r\na=fmtp:96 profile-level-id=42e01f;packetization-mode=1;level-asymmetry-allowed=1\r\na=rtpmap:97 RTX/90000\r\na=fmtp:97 apt=96\r\na=setup:actpass\r\na=ice-ufrag:59N/\r\na=ice-pwd:AobW0EuWMc7kyT5jO2zPY0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nc=IN IP4 0.0.0.0\r\na=mid:audio\r\na=sendonly\r\na=ssrc:43 cname:audio-send\r\na=ssrc:43 msid:audio-stream audio-track\r\na=msid:audio-stream audio-track\r\na=rtcp-mux\r\na=rtpmap:111 opus/48000/2\r\na=fmtp:111 minptime=10;maxaveragebitrate=96000;stereo=1;sprop-stereo=1;useinbandfec=1\r\na=setup:actpass\r\na=ice-ufrag:59N/\r\na=ice-pwd:AobW0EuWMc7kyT5jO2zPY0\r\n
+[2025-11-14 14:27:54.051][INFO][931][u10e092v] RTC local answer: v=0\r\no=SRS/7.0.126(Kai) 102331076929952 2 IN IP4 0.0.0.0\r\ns=SRSPublishSession\r\nt=0 0\r\na=ice-lite\r\na=group:BUNDLE video audio\r\na=msid-semantic: WMS live/roomID\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\nc=IN IP4 0.0.0.0\r\na=ice-ufrag:v9671l24\r\na=ice-pwd:335t589l7tuyg38o2x30sk0y2d6v0833\r\na=fingerprint:sha-256 D6:1C:BA:23:47:08:B3:AF:4D:92:3A:03:3D:75:2C:DE:C0:65:FC:E0:A5:AD:48:82:5A:69:19:CC:19:62:77:2F\r\na=setup:passive\r\na=mid:video\r\na=recvonly\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rtpmap:96 H264/90000\r\na=rtcp-fb:96 nack\r\na=rtcp-fb:96 nack pli\r\na=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f\r\na=candidate:0 1 udp 2130706431 10.0.0.7 8000 typ host generation 0\r\na=candidate:1 1 udp 2130706431 172.24.73.45 8000 typ host generation 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nc=IN IP4 0.0.0.0\r\na=ice-ufrag:v9671l24\r\na=ice-pwd:335t589l7tuyg38o2x30sk0y2d6v0833\r\na=fingerprint:sha-256 D6:1C:BA:23:47:08:B3:AF:4D:92:3A:03:3D:75:2C:DE:C0:65:FC:E0:A5:AD:48:82:5A:69:19:CC:19:62:77:2F\r\na=setup:passive\r\na=mid:audio\r\na=recvonly\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rtpmap:111 opus/48000/2\r\na=fmtp:111 minptime=10;useinbandfec=1;stereo=1\r\na=candidate:0 1 udp 2130706431 10.0.0.7 8000 typ host generation 0\r\na=candidate:1 1 udp 2130706431 172.24.73.45 8000 typ host generation 0\r\n
+[2025-11-14 14:27:54.098][INFO][931][u10e092v] RTC: before dispose resource(HttpConn)(0x5d11cf7f3760), conns=2, zombies=0, ign=0, inz=0, ind=0
+[2025-11-14 14:27:54.098][WARN][931][u10e092v][104] client disconnect peer. ret=1007
+[2025-11-14 14:27:54.099][INFO][931][654t6744] RTC: clear zombies=1 resources, conns=2, removing=0, unsubs=0
+[2025-11-14 14:27:54.099][INFO][931][u10e092v] RTC: disposing #0 resource(HttpConn)(0x5d11cf7f3760), conns=2, disposing=1, zombies=0
+[2025-11-14 14:27:54.183][INFO][931][u10e092v] RTC: session address init 172.24.64.1:10548
+[2025-11-14 14:27:54.183][INFO][931][u10e092v] RTC: session STUN done, waiting DTLS handshake.
+[2025-11-14 14:27:54.183][INFO][931][r91724kc] <- RTC RECV #11, udp 1, pps 0/0, schedule 1
+[2025-11-14 14:27:54.193][INFO][931][u10e092v] DTLS: State Passive RECV, done=0, arq=0, r0=211, len=211, cnt=22, size=198, hs=1
+[2025-11-14 14:27:54.193][INFO][931][u10e092v] DTLS: State Passive SEND, done=0, arq=0, r0=0, len=679, cnt=22, size=82, hs=2
+[2025-11-14 14:27:54.197][INFO][931][u10e092v] DTLS: State Passive RECV, done=0, arq=0, r0=584, len=584, cnt=22, size=305, hs=11
+[2025-11-14 14:27:54.198][INFO][931][u10e092v] DTLS: State Passive SEND, done=0, arq=0, r0=0, len=570, cnt=22, size=482, hs=4
+[2025-11-14 14:27:54.198][INFO][931][u10e092v] RTC: DTLS handshake done.
+[2025-11-14 14:27:54.198][INFO][931][u10e092v] RTC: session pub=1, sub=0, to=30000ms connection established
+[2025-11-14 14:27:54.198][INFO][931][u10e092v] RTC: Publisher url=/live/roomID established
+[2025-11-14 14:27:54.204][INFO][931][u10e092v] hls: win=60000ms, frag=10000ms, prefix=, path=./objs/nginx/html, m3u8=[app]/[stream].m3u8, ts=[app]/[stream]-[seq].ts, tdr=1.00, aof=2.10, floor=0, clean=1, waitk=1, dispose=120000ms, dts_directly=1
+[2025-11-14 14:27:54.204][INFO][931][u10e092v] ignore disabled exec for vhost=__defaultVhost__
+[2025-11-14 14:27:54.204][INFO][931][u10e092v] http: mount flv stream for sid=/live/roomID, mount=/live/roomID.flv
+[2025-11-14 14:27:54.269][INFO][931][u10e092v] RTC: parsed H264 codec, profile=Baseline, level=3.1
+[2025-11-14 14:27:54.269][INFO][931][u10e092v] RTC: Discard no-sync Video, ssrc=42, seq=53187, ts=549246978, state=-1
+[2025-11-14 14:27:58.741][INFO][931][j33j8ek0] RTC: Server conns=1
+[2025-11-14 14:27:58.742][INFO][931][j33j8ek0] SRS: cpu=2.00%,23MB, cid=3,1, timer=62,3,15, clock=0,40,8,1,0,0,0,0,0, free=1, objs=(pkt:28,raw:1,fua:28,msg:0,oth:0,buf:28)
+[2025-11-14 14:28:00.229][INFO][931][j33j8ek0] RTC: to rtmp bridge request key frame, ssrc=42, publisher cid=u10e092v
+[2025-11-14 14:28:00.229][INFO][931][j33j8ek0] RTC: Need PLI ssrc=42, play=[u10e092v], publish=[u10e092v], count=1/1
+[2025-11-14 14:28:00.229][INFO][931][u10e092v] RTC: Request PLI ssrc=42, play=[u10e092v], count=1/1, bytes=12B
+[2025-11-14 14:28:02.831][INFO][931][22728551] HTTP #0 172.24.64.1:54081 GET http://172.24.73.45:1985/rtc/v1/whep/?app=live&stream=roomID, content-length=-1
+[2025-11-14 14:28:02.831][INFO][931][22728551] RTC whip play /live/roomID, clientip=172.24.64.1, app=live, stream=roomID, offer=0B, eip=, vcodec=, acodec=, srtp=, dtls=, ufrag=, pwd=, param=app=live&stream=roomID
+[2025-11-14 14:28:02.831][WARN][931][22728551][11] WHIP: serve http for http://172.24.73.45:1985/rtc/v1/whep/?app=live&stream=roomID with err 5043:RtcInvalidSdp, code=5043(RtcInvalidSdp)(Invalid SDP for RTC) : serve : empty remote sdp
+thread [931][22728551]: serve_http_with() [./src/app/srs_app_rtc_api.cpp:745][errno=11]
+thread [931][22728551]: do_serve_http_with() [./src/app/srs_app_rtc_api.cpp:856][errno=11]
+[2025-11-14 14:28:02.876][INFO][931][22728551] RTC: before dispose resource(HttpConn)(0x5d11cf7d2ec0), conns=3, zombies=0, ign=0, inz=0, ind=0
+[2025-11-14 14:28:02.876][WARN][931][22728551][104] client disconnect peer. ret=1007
+[2025-11-14 14:28:02.876][INFO][931][654t6744] RTC: clear zombies=1 resources, conns=3, removing=0, unsubs=0
+[2025-11-14 14:28:02.876][INFO][931][22728551] RTC: disposing #0 resource(HttpConn)(0x5d11cf7d2ec0), conns=3, disposing=1, zombies=0
+[2025-11-14 14:28:03.118][INFO][931][80b0342c] HTTP #0 172.24.64.1:64405 GET http://172.24.73.45:1985/favicon.ico, content-length=-1
+[2025-11-14 14:28:03.171][INFO][931][80b0342c] RTC: before dispose resource(HttpConn)(0x5d11cf8158b0), conns=2, zombies=0, ign=0, inz=0, ind=0
+[2025-11-14 14:28:03.171][WARN][931][80b0342c][104] client disconnect peer. ret=1007
+[2025-11-14 14:28:03.171][INFO][931][654t6744] RTC: clear zombies=1 resources, conns=2, removing=0, unsubs=0
+[2025-11-14 14:28:03.171][INFO][931][80b0342c] RTC: disposing #0 resource(HttpConn)(0x5d11cf8158b0), conns=2, disposing=1, zombies=0
+[2025-11-14 14:28:03.746][INFO][931][j33j8ek0] RTC: Server conns=1
+[2025-11-14 14:28:03.746][INFO][931][j33j8ek0] SRS: cpu=2.00%,24MB, cid=3,1, timer=62,3,15, clock=0,40,8,1,0,0,0,0,0, free=1, objs=(pkt:28,raw:1,fua:28,msg:0,oth:0,buf:28)
+[2025-11-14 14:28:04.192][INFO][931][r91724kc] <- RTC RECV #11, udp 969, pps 5/96, schedule 969
+[2025-11-14 14:28:06.054][INFO][931][6jt1175y] HTTP #0 172.24.64.1:52780 GET http://172.24.73.45:1985/rtc/v1/whep/?app=live&stream=roomID, content-length=-1
+[2025-11-14 14:28:06.054][INFO][931][6jt1175y] RTC whip play /live/roomID, clientip=172.24.64.1, app=live, stream=roomID, offer=0B, eip=, vcodec=, acodec=, srtp=, dtls=, ufrag=, pwd=, param=app=live&stream=roomID
+[2025-11-14 14:28:06.054][WARN][931][6jt1175y][11] WHIP: serve http for http://172.24.73.45:1985/rtc/v1/whep/?app=live&stream=roomID with err 5043:RtcInvalidSdp, code=5043(RtcInvalidSdp)(Invalid SDP for RTC) : serve : empty remote sdp
+thread [931][6jt1175y]: serve_http_with() [./src/app/srs_app_rtc_api.cpp:745][errno=11]
+thread [931][6jt1175y]: do_serve_http_with() [./src/app/srs_app_rtc_api.cpp:856][errno=11]
+[2025-11-14 14:28:06.096][INFO][931][6jt1175y] RTC: before dispose resource(HttpConn)(0x5d11cf8158b0), conns=3, zombies=0, ign=0, inz=0, ind=0
+[2025-11-14 14:28:06.096][WARN][931][6jt1175y][104] client disconnect peer. ret=1007
+[2025-11-14 14:28:06.096][INFO][931][654t6744] RTC: clear zombies=1 resources, conns=3, removing=0, unsubs=0
+[2025-11-14 14:28:06.096][INFO][931][6jt1175y] RTC: disposing #0 resource(HttpConn)(0x5d11cf8158b0), conns=3, disposing=1, zombies=0
+[2025-11-14 14:28:06.263][INFO][931][j33j8ek0] RTC: to rtmp bridge request key frame, ssrc=42, publisher cid=u10e092v
+[2025-11-14 14:28:06.266][INFO][931][0v3habzs] HTTP #0 172.24.64.1:49256 GET http://172.24.73.45:1985/favicon.ico, content-length=-1
+[2025-11-14 14:28:06.314][INFO][931][0v3habzs] RTC: before dispose resource(HttpConn)(0x5d11cf7d2ec0), conns=2, zombies=0, ign=0, inz=0, ind=0
+[2025-11-14 14:28:06.314][WARN][931][0v3habzs][104] client disconnect peer. ret=1007
+[2025-11-14 14:28:06.314][INFO][931][654t6744] RTC: clear zombies=1 resources, conns=2, removing=0, unsubs=0
+[2025-11-14 14:28:06.314][INFO][931][0v3habzs] RTC: disposing #0 resource(HttpConn)(0x5d11cf7d2ec0), conns=2, disposing=1, zombies=0
+[2025-11-14 14:28:08.750][INFO][931][j33j8ek0] RTC: Server conns=1, rpkts=(99,rtp:99,stun:1,rtcp:0), spkts=(4,rtp:0,stun:1,rtcp:8), rtcp=(pli:1,twcc:0,rr:1), snk=(96,a:48,v:48,h:0), fid=(id:0,fid:99,ffid:0,addr:1,faddr:99)
+[2025-11-14 14:28:08.750][INFO][931][j33j8ek0] SRS: cpu=2.00%,24MB, cid=7,3, timer=62,10,48, clock=0,41,6,0,0,0,0,0,0, free=1, objs=(pkt:99,raw:0,fua:99,msg:0,oth:0,buf:99)
+[2025-11-14 14:28:12.301][INFO][931][j33j8ek0] RTC: to rtmp bridge request key frame, ssrc=42, publisher cid=u10e092v
+[2025-11-14 14:28:12.302][INFO][931][j33j8ek0] RTC: Need PLI ssrc=42, play=[u10e092v], publish=[u10e092v], count=3/3
+[2025-11-14 14:28:12.302][INFO][931][u10e092v] RTC: Request PLI ssrc=42, play=[u10e092v], count=3/3, bytes=12B
+[2025-11-14 14:28:13.754][INFO][931][j33j8ek0] RTC: Server conns=1, rpkts=(99,rtp:99,stun:1,rtcp:0), spkts=(4,rtp:0,stun:1,rtcp:8), rtcp=(pli:1,twcc:0,rr:1), snk=(96,a:48,v:48,h:0), fid=(id:0,fid:99,ffid:0,addr:1,faddr:99)
+[2025-11-14 14:28:13.755][INFO][931][j33j8ek0] SRS: cpu=3.00%,24MB, cid=7,3, timer=62,10,48, clock=0,41,6,0,0,0,0,0,0, free=1, objs=(pkt:99,raw:0,fua:99,msg:0,oth:0,buf:99)
+[2025-11-14 14:28:14.231][INFO][931][r91724kc] <- RTC RECV #11, udp 998, pps 10/99, schedule 998
+[2025-11-14 14:28:18.337][INFO][931][j33j8ek0] RTC: to rtmp bridge request key frame, ssrc=42, publisher cid=u10e092v
+[2025-11-14 14:28:18.756][INFO][931][j33j8ek0] RTC: Server conns=1, rpkts=(98,rtp:98,stun:1,rtcp:0), spkts=(4,rtp:0,stun:1,rtcp:8), rtcp=(pli:1,twcc:0,rr:1), snk=(96,a:48,v:48,h:0), fid=(id:0,fid:98,ffid:0,addr:1,faddr:98)
+[2025-11-14 14:28:18.756][INFO][931][j33j8ek0] SRS: cpu=2.00%,24MB, cid=1,1, timer=62,10,48, clock=0,41,7,0,0,0,0,0,0, objs=(pkt:98,raw:0,fua:98,msg:0,oth:0,buf:98)
+[2025-11-14 14:28:23.759][INFO][931][j33j8ek0] RTC: Server conns=1, rpkts=(98,rtp:98,stun:1,rtcp:0), spkts=(4,rtp:0,stun:1,rtcp:8), rtcp=(pli:1,twcc:0,rr:1), snk=(96,a:48,v:48,h:0), fid=(id:0,fid:98,ffid:0,addr:1,faddr:98)
+[2025-11-14 14:28:23.759][INFO][931][j33j8ek0] SRS: cpu=1.00%,24MB, cid=1,1, timer=62,10,48, clock=0,41,7,0,0,0,0,0,0, objs=(pkt:98,raw:0,fua:98,msg:0,oth:0,buf:98)
+[2025-11-14 14:28:24.370][INFO][931][j33j8ek0] RTC: to rtmp bridge request key frame, ssrc=42, publisher cid=u10e092v
+[2025-11-14 14:28:24.370][INFO][931][j33j8ek0] RTC: Need PLI ssrc=42, play=[u10e092v], publish=[u10e092v], count=5/5
+[2025-11-14 14:28:24.370][INFO][931][u10e092v] RTC: Request PLI ssrc=42, play=[u10e092v], count=5/5, bytes=12B
+^C[2025-11-14 14:28:24.683][INFO][931][j33j8ek0] sig=2, user terminate program, fast quit
+[2025-11-14 14:28:24.758][INFO][931][j33j8ek0] cleanup for quit signal fast=1, grace=0
+[2025-11-14 14:28:24.758][WARN][931][j33j8ek0][11] main cycle terminated, system quit normally.
+[2025-11-14 14:28:24.758][WARN][931][j33j8ek0][4] RTMP listener: Ignore error, code=1081(SocketAccept)(Accpet client socket failed) : accept at fd=8
+thread [931][j33j8ek0]: do_cycle() [./src/app/srs_app_listener.cpp:350][errno=4]
+[2025-11-14 14:28:24.758][WARN][931][j33j8ek0][4] HTTP-API listener: Ignore error, code=1081(SocketAccept)(Accpet client socket failed) : accept at fd=9
+thread [931][j33j8ek0]: do_cycle() [./src/app/srs_app_listener.cpp:350][errno=4]
+[2025-11-14 14:28:24.758][WARN][931][j33j8ek0][4] HTTP-Server listener: Ignore error, code=1081(SocketAccept)(Accpet client socket failed) : accept at fd=10
+thread [931][j33j8ek0]: do_cycle() [./src/app/srs_app_listener.cpp:350][errno=4]
+[2025-11-14 14:28:24.858][INFO][931][j33j8ek0] Drop ts segment, sequence_no=0, uri=roomID-0.ts, duration=0ms
+[2025-11-14 14:28:24.859][INFO][931][j33j8ek0] gracefully dispose hls /live/roomID
+[2025-11-14 14:28:24.859][INFO][931][j33j8ek0] srs disposed
+[2025-11-14 14:28:24.859][INFO][931][j33j8ek0] srs terminated
+
+
+libdatachannel客户端日志：

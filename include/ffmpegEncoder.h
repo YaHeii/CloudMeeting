@@ -37,7 +37,7 @@ private:
     QUEUE_DATA<AVPacketPtr> *m_packetQueue;
 
     std::atomic<bool> m_isEncoding = false;
-
+    std::atomic<bool> m_forceKeyframe = false;
     AVCodecContext *m_codecCtx = nullptr;
     AVMediaType m_mediaType;
 
@@ -69,6 +69,7 @@ public slots:
     void stopEncoding();
 
     void doEncodingWork();
+    void requestKeyFrame();
 };
 
 
