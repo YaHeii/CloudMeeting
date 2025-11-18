@@ -51,23 +51,27 @@ bool ffmpegVideoDecoder::init(AVCodecParameters *params, AVRational inputTimeBas
 
 }
 
-void ffmpegVideoDecoder::startDecoding() {
-    if (!m_codecCtx) {
-        WRITE_LOG("Decoder not initialized, cannot start decoding.");
-        return;
-    }
+void ffmpegVideoDecoder::ChangeDecodingState(bool isDecoding) {
+    m_isDecoding = isDecoding;
     if (m_isDecoding) {
-        WRITE_LOG("Decoding already in progress.");
-        return; // 防止重复启动
+        if (!m_codecCtx) {
+            WRITE_LOG("Decoder not initialized, cannot start decoding.");
+            return;
+        }
+        QMetaObject::invokeMethod(this, "startDecoding", Qt::QueuedConnection);
+    } else {
+        stopDecoding();
     }
-    WRITE_LOG("Starting video decoding loop...");
-    m_isDecoding = true;
 
+}
+
+void ffmpegVideoDecoder::startDecoding() {
+    WRITE_LOG("Starting video decoding loop...");
     QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
 }
 
 void ffmpegVideoDecoder::stopDecoding() {
-    m_isDecoding = false;
+    WRITE_LOG("Stopping video decoding loop...");
 }
 
 
@@ -76,7 +80,7 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         WRITE_LOG("Video decoding loop finished.");
         return;
     }
-    qDebug() << "isDecoding frame";
+    qDebug() << "isDecodingframe";
     AVPacketPtr packet;
     if (!m_packetQueue->dequeue(packet)) {
         if (m_isDecoding) {
@@ -139,7 +143,7 @@ void ffmpegVideoDecoder::doDecodingPacket() {
     else {
         sendFrame->pts = AV_NOPTS_VALUE;
     }
-    if(m_isEncoding){
+    if(m_isDecoding){
         m_frameQueue->enqueue(std::move(sendFrame));
     }
 
@@ -188,7 +192,6 @@ void ffmpegVideoDecoder::doDecodingPacket() {
 
             //通知UI线程有新帧可用
         emit newFrameAvailable();
-        //WRITE_LOG("NewFrameAvailable");
 		qDebug() << "NewFrameAvailable";
     }
     av_frame_unref(decodedFrame.get());
@@ -201,12 +204,9 @@ void ffmpegVideoDecoder::doDecodingPacket() {
     }
 }
 
-void ffmpegVideoDecoder::ChangeDecodingState(bool isEncoding){
-        m_isEncoding = isEncoding;
-}
 
 void ffmpegVideoDecoder::clear() {
-    stopDecoding(); 
+    m_isDecoding = false;
     {
         QMutexLocker locker(&m_workMutex);
         // 如果doDecodingPacket的核心部分正在执行，则等待它完成

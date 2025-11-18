@@ -91,6 +91,9 @@ private:
     VideoWidget *m_videoLocalWidget;
     VideoWidget *m_videoRemoteWidget;
 
+    bool m_isVideoDecoderReady = false;
+    bool m_isAudioDecoderReady = false;
+
     bool m_videoEncoderReady = false;
     bool m_audioEncoderReady = false;
 

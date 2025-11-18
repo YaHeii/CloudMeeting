@@ -188,22 +188,21 @@ MainWindow::~MainWindow() {
 //// 打开视频按钮（开关复用）
 void MainWindow::on_openVideo_clicked() {
     if (m_isVideoRunning) {
-        // --- 停止采集 ---
-        QMetaObject::invokeMethod(m_Capture, "closeVideo", Qt::QueuedConnection);
-        // --- 停止解码 ---
-        QMetaObject::invokeMethod(m_videoDecoder, "stopDecoding", Qt::QueuedConnection);
-        // --- 停止编码 ---
-        QMetaObject::invokeMethod(m_videoEncoder, "stopEncoding", Qt::QueuedConnection);
-        // --- 清空队列 ---
-        m_videoPacketQueue->clear();
-        m_videoFrameQueue->clear();
-        m_SmallQimageQueue->clear();
+        
+        //// --- 停止采集 ---
+        //QMetaObject::invokeMethod(m_Capture, "closeVideo", Qt::QueuedConnection);
+        //// --- 停止解码 ---
+        //QMetaObject::invokeMethod(m_videoDecoder, "stopDecoding", Qt::QueuedConnection);
+        //// --- 停止编码 ---
+        //QMetaObject::invokeMethod(m_videoEncoder, "stopEncoding", Qt::QueuedConnection);
+        //// --- 清空队列 ---
+        //m_videoPacketQueue->clear();
+        //m_videoFrameQueue->clear();
+        //m_SmallQimageQueue->clear();
 
 
         // --- 更新UI和状态 ---
         ui->openVideo->setText("开启视频");
-        m_isVideoRunning = false;
-        // m_videoLocalWidget->updateFrame(nullptr);
         qDebug() << "Video stopped.";
     } else {
         QString videoDevice = ui->videoDeviceComboBox->currentText();
@@ -252,8 +251,6 @@ void MainWindow::on_openAudio_clicked() {
         qDebug() << "Starting Audio...";
     }
 }
-
-
 
 //// 开启直播按钮
 void MainWindow::on_LiveStreamingBtn_clicked() {
@@ -411,16 +408,19 @@ void MainWindow::onDeviceOpened(AVCodecParameters *vParams, AVCodecParameters *a
         QMetaObject::invokeMethod(m_videoDecoder, "init", Qt::QueuedConnection,
             Q_ARG(AVCodecParameters*, m_videoParams),
             Q_ARG(AVRational, m_audioTimeBase));
-        QMetaObject::invokeMethod(m_videoDecoder, "startDecoding", Qt::QueuedConnection);
+        m_isVideoDecoderReady = true;
+        QMetaObject::invokeMethod(m_videoDecoder, "ChangeDecodingState",Qt::QueuedConnection,
+                                  Q_ARG(bool, m_isVideoDecoderReady));
     }
     if (m_audioParams) {
-        qDebug("Initializing audio pipeline(AAC)");
+        qDebug("Initializing audio pipeline");
         QMetaObject::invokeMethod(m_audioDecoder, "init", Qt::QueuedConnection,
             Q_ARG(AVCodecParameters*, m_audioParams),
             Q_ARG(AVRational, m_audioTimeBase));
-        QMetaObject::invokeMethod(m_audioDecoder, "startDecoding", Qt::QueuedConnection);
+        m_isAudioDecoderReady = true;
+        QMetaObject::invokeMethod(m_audioDecoder, "ChangeDecodingState", Qt::QueuedConnection,
+                                  Q_ARG(bool, m_isAudioDecoderReady));
     }
-    QMetaObject::invokeMethod(m_Capture, "startReading", Qt::QueuedConnection);
 }
 
 void MainWindow::onNewLocalFrameAvailable() {

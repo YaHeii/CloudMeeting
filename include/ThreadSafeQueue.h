@@ -30,7 +30,7 @@ public:
             m_notFullCond.wait(&m_mutex);
         }
 
-        m_queue.push(std::move(item));
+        m_queue.push(std::move(item));     
         m_notEmptyCond.wakeOne();
     }
 
@@ -54,7 +54,6 @@ public:
 
         //唤醒一个可能正在等待的生产者
         m_notFullCond.wakeOne();
-
         return true;
     }
 
@@ -66,6 +65,7 @@ public:
 
         // 唤醒所有可能在等待队列变满的生产者线程
         m_notFullCond.wakeAll();
+        m_notEmptyCond.wakeAll();
     }
 
 private:

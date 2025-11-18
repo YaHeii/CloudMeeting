@@ -81,15 +81,23 @@ void ffmpegAudioDecoder::setResampleConfig(const AudioResampleConfig &config) {
     }
 }
 
+void ffmpegAudioDecoder::ChangeDecodingState(bool isEncoding) {
+    m_isDecoding = isEncoding;
+    if (m_isDecoding) {
+        startDecoding();
+    }
+    else {
+        stopDecoding();
+    }
+}
+
 void ffmpegAudioDecoder::startDecoding() {
-    if (m_isDecoding) return;
-    m_isDecoding = true;
     QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
     WRITE_LOG("Audio decoding process started.");
 }
 
 void ffmpegAudioDecoder::stopDecoding() {
-    m_isDecoding = false;
+    WRITE_LOG("Audio decoding process stopped.");
 }
 
 void ffmpegAudioDecoder::doDecodingPacket() {
@@ -186,9 +194,6 @@ void ffmpegAudioDecoder::doDecodingPacket() {
 
 }
 
-void ffmpegAudioDecoder::ChangeDecodingState(bool isEncoding) {
-    m_isDecoding = isEncoding;
-}
 
 void ffmpegAudioDecoder::clear() {
     stopDecoding();

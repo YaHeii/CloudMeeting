@@ -39,7 +39,6 @@ private:
 
     uint8_t *rgbBuffer = nullptr;
     std::atomic<bool> m_isDecoding = false;
-	std::atomic<bool> m_isEncoding = false;
 
     AVCodecContext *m_codecCtx = nullptr;
     const AVCodec *m_codec = nullptr;

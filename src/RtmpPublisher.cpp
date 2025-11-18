@@ -264,6 +264,9 @@ void RtmpPublisher::doPublishingWork() {
     }
 }
 
+/// <summary>
+/// 彻底释放对象时调用
+/// </summary>
 void RtmpPublisher::clear() {
     stopPublishing();
     //增加同步等待
