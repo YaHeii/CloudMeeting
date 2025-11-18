@@ -53,6 +53,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_Capture = new Capture(m_videoPacketQueue, m_audioPacketQueue);
     m_Capture->moveToThread(m_CaptureThread);
     m_CaptureThread->start();
+    //// 采集器打开，发出信号携带解码参数
+    connect(m_Capture, &Capture::audioDeviceOpenSuccessfully, this, &MainWindow::onAudioDeviceOpened);
+    connect(m_Capture, &Capture::videoDeviceOpenSuccessfully, this, &MainWindow::onVideoDeviceOpened);
 
     //音频解码线程
     m_audioDecoderThread = new QThread(this);
@@ -103,8 +106,7 @@ MainWindow::MainWindow(QWidget *parent)
     QStringList audioDevices = DeviceEnumerator::getDevices(MediaType::Audio);
     ui->audioDevicecomboBox->addItems(audioDevices);
 
-    //// 采集器打开，发出信号携带解码参数
-    connect(m_Capture, &Capture::deviceOpenSuccessfully, this, &MainWindow::onDeviceOpened);
+
     
     //// TODO：创建全局单例->参数管理器，解耦编码器参数传递
     //// 视频
@@ -188,22 +190,11 @@ MainWindow::~MainWindow() {
 //// 打开视频按钮（开关复用）
 void MainWindow::on_openVideo_clicked() {
     if (m_isVideoRunning) {
-        
-        //// --- 停止采集 ---
-        //QMetaObject::invokeMethod(m_Capture, "closeVideo", Qt::QueuedConnection);
-        //// --- 停止解码 ---
-        //QMetaObject::invokeMethod(m_videoDecoder, "stopDecoding", Qt::QueuedConnection);
-        //// --- 停止编码 ---
-        //QMetaObject::invokeMethod(m_videoEncoder, "stopEncoding", Qt::QueuedConnection);
-        //// --- 清空队列 ---
-        //m_videoPacketQueue->clear();
-        //m_videoFrameQueue->clear();
-        //m_SmallQimageQueue->clear();
-
-
-        // --- 更新UI和状态 ---
+        QMetaObject::invokeMethod(m_Capture, "closeVideo", Qt::QueuedConnection);
         ui->openVideo->setText("开启视频");
+        m_isVideoRunning = false;
         qDebug() << "Video stopped.";
+        WRITE_LOG("Video stopped.");
     } else {
         QString videoDevice = ui->videoDeviceComboBox->currentText();
         if (videoDevice.isEmpty()) {
@@ -211,44 +202,32 @@ void MainWindow::on_openVideo_clicked() {
             return;
         }
         QMetaObject::invokeMethod(m_Capture, "openVideo", Qt::QueuedConnection,Q_ARG(QString, videoDevice));
-
-        // --- 更新UI和状态 ---
         ui->openVideo->setText("关闭视频");
         m_isVideoRunning = true;
         qDebug() << "Video started.";
+        WRITE_LOG("Video started.");
     }
 }
 
 //// 打开麦克风按钮（开关复用）
 void MainWindow::on_openAudio_clicked() {
     if (m_isAudioRunning) {
-        // --- 停止采集 ---
         QMetaObject::invokeMethod(m_Capture, "closeAudio", Qt::QueuedConnection);
-        // --- 停止解码 ---
-        QMetaObject::invokeMethod(m_audioDecoder, "stopDecoding", Qt::QueuedConnection);
-        // --- 停止编码 ---
-        QMetaObject::invokeMethod(m_audioEncoder, "stopEncoding", Qt::QueuedConnection);
-        // --- 清空队列 ---
-        m_audioPacketQueue->clear();
-        m_audioFrameQueue->clear();
-
-        // --- 更新UI和状态 ---
         ui->openAudio->setText("打开麦克风");
         m_isAudioRunning = false;
         qDebug() << "Audio stopped.";
+        WRITE_LOG("Audio stopped.");
     } else {
-        QString videoDevice = ui->videoDeviceComboBox->currentText();
-        if (videoDevice.isEmpty()) {
+        QString audioDevice = ui->audioDevicecomboBox->currentText();
+        if (audioDevice.isEmpty()) {
             qWarning() << "No video device selected!";
             return;
         }
-        QString audioDevice = ui->audioDevicecomboBox->currentText();
         QMetaObject::invokeMethod(m_Capture, "openAudio", Qt::QueuedConnection,Q_ARG(QString, audioDevice));
-
-        // --- 更新UI和状态 ---
         ui->openAudio->setText("关闭麦克风");
         m_isAudioRunning = true;
-        qDebug() << "Starting Audio...";
+        qDebug() << "Starting Audio.";
+        WRITE_LOG("Starting Audio.");
     }
 }
 
@@ -396,22 +375,9 @@ void MainWindow::on_exitmeetBtn_clicked() {
     QMetaObject::invokeMethod(m_Capture, "closeDevice", Qt::QueuedConnection);
 }
 
-void MainWindow::onDeviceOpened(AVCodecParameters *vParams, AVCodecParameters *aParams, AVRational vTimeBase, AVRational aTimeBase) {
-	// 传递数据包
-	m_videoParams = vParams;
+void MainWindow::onAudioDeviceOpened(AVCodecParameters* aParams, AVRational aTimeBase) {
     m_audioParams = aParams;
-	m_audioTimeBase = aTimeBase;
-	m_videoTimeBase = vTimeBase;
-    qDebug() << "onDeviceOpened";
-    if (m_videoParams) {
-        qDebug("Initializing video decoder & rendering");
-        QMetaObject::invokeMethod(m_videoDecoder, "init", Qt::QueuedConnection,
-            Q_ARG(AVCodecParameters*, m_videoParams),
-            Q_ARG(AVRational, m_audioTimeBase));
-        m_isVideoDecoderReady = true;
-        QMetaObject::invokeMethod(m_videoDecoder, "ChangeDecodingState",Qt::QueuedConnection,
-                                  Q_ARG(bool, m_isVideoDecoderReady));
-    }
+    m_audioTimeBase = aTimeBase;
     if (m_audioParams) {
         qDebug("Initializing audio pipeline");
         QMetaObject::invokeMethod(m_audioDecoder, "init", Qt::QueuedConnection,
@@ -419,7 +385,21 @@ void MainWindow::onDeviceOpened(AVCodecParameters *vParams, AVCodecParameters *a
             Q_ARG(AVRational, m_audioTimeBase));
         m_isAudioDecoderReady = true;
         QMetaObject::invokeMethod(m_audioDecoder, "ChangeDecodingState", Qt::QueuedConnection,
-                                  Q_ARG(bool, m_isAudioDecoderReady));
+            Q_ARG(bool, m_isAudioDecoderReady));
+    }
+}
+
+void MainWindow::onVideoDeviceOpened(AVCodecParameters *vParams, AVRational vTimeBase) {
+    m_videoParams = vParams;
+    m_videoTimeBase = vTimeBase;
+    if (m_videoParams) {
+        qDebug("Initializing video pipeline");
+        QMetaObject::invokeMethod(m_videoDecoder, "init", Qt::QueuedConnection,
+            Q_ARG(AVCodecParameters*, m_videoParams),
+            Q_ARG(AVRational, m_audioTimeBase));
+        m_isVideoDecoderReady = true;
+        QMetaObject::invokeMethod(m_videoDecoder, "ChangeDecodingState", Qt::QueuedConnection,
+            Q_ARG(bool, m_isVideoDecoderReady));
     }
 }
 

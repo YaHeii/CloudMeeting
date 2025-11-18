@@ -80,7 +80,6 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         WRITE_LOG("Video decoding loop finished.");
         return;
     }
-    qDebug() << "isDecodingframe";
     AVPacketPtr packet;
     if (!m_packetQueue->dequeue(packet)) {
         if (m_isDecoding) {
@@ -93,6 +92,7 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = true;
     }
+
     auto work_guard = [this]() {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = false;
@@ -118,7 +118,6 @@ void ffmpegVideoDecoder::doDecodingPacket() {
     int ret = avcodec_receive_frame(m_codecCtx, decodedFrame.get());
 
     if (ret < 0) {
-            //EAGAIN 或 EOF 表示这个包已经处理完了，可以跳出内层循环
         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
             return;
         }
@@ -146,7 +145,6 @@ void ffmpegVideoDecoder::doDecodingPacket() {
     if(m_isDecoding){
         m_frameQueue->enqueue(std::move(sendFrame));
     }
-
 
     bool formatChanged = (m_swsSrcWidth != m_codecCtx->width ||
                             m_swsSrcHeight != m_codecCtx->height ||
@@ -191,16 +189,15 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         m_QimageQueue->enqueue(std::move(image)); //添加到图片队列，用于QT渲染
 
             //通知UI线程有新帧可用
+        //WRITE_LOG("New frame available.");
         emit newFrameAvailable();
-		qDebug() << "NewFrameAvailable";
+
     }
     av_frame_unref(decodedFrame.get());
 
     work_guard();
     if (m_isDecoding) {
         QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
-    } else {
-        WRITE_LOG("Video decoding loop finished.");
     }
 }
 

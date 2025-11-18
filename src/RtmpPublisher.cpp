@@ -103,14 +103,13 @@ bool RtmpPublisher::init(const QString &rtmpUrl, AVCodecContext *vCodecCtx, AVCo
 void RtmpPublisher::ChangeRtmpPublishingState(bool isPublishing) {
     m_isPublishing = isPublishing;
     if (m_isPublishing) {
-        if (m_isPublishing || !m_outputFmtCtx) {
+        if (!m_outputFmtCtx) {
             WRITE_LOG("Publisher already started or not initialized.");
             return;
         }
         startPublishing();
     } else {
         stopPublishing();
-        clear();
     }
 }
 
@@ -143,7 +142,6 @@ void RtmpPublisher::doPublishingWork() {
         m_isDoingWork = false;
         m_workCond.wakeAll();
      };
-    qDebug() << "isRtmpPublishingWork";
     AVPacketPtr packet;
     if (!m_encodedPacketQueue->dequeue(packet)) {
         if (m_isPublishing) {

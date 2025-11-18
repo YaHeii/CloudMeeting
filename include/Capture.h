@@ -1,12 +1,6 @@
-﻿/**
-*     madebyYahei
-*    捕捉packet，生成视频音频packet队列，返回音视频param
-*    QUEUE_DATA<AVPacketPtr>* m_VideopacketQueue = nullptr;
-     QUEUE_DATA<AVPacketPtr>* m_AudiopacketQueue = nullptr;
- */
-
-#ifndef CAPTURE_H
+﻿#ifndef CAPTURE_H
 #define CAPTURE_H
+
 #include <QObject>
 #include "AVSmartPtrs.h"
 #include "ThreadSafeQueue.h"
@@ -31,55 +25,66 @@ public:
 
     ~Capture();
 
-
-
 private:
-    AVFormatContext *m_FormatCtx = nullptr;
+    static void initializeFFmpeg();
+    AVFormatContext* m_VideoFormatCtx = nullptr;
+    AVFormatContext* m_AudioFormatCtx = nullptr;
+
     int m_videoStreamIndex = -1;
     int m_audioStreamIndex = -1;
 
-    AVCodecParameters *vParams = nullptr;
-    AVCodecParameters *aParams = nullptr;
+    AVCodecParameters *m_vParams = nullptr;
+    AVCodecParameters *m_aParams = nullptr;
+    AVRational m_vTimeBase = { 0, 1 };
+    AVRational m_aTimeBase = { 0, 1 };
 
-    std::atomic<bool> m_isReading = false;
-    std::atomic<bool> m_isVideo = false;
-    std::atomic<bool> m_isAudio = false;
+
+    std::atomic<bool> m_isVideoOpen = false; 
+    std::atomic<bool> m_isAudioOpen = false; 
     QString m_videoDeviceName;
     QString m_audioDeviceName;
 
-    static void initializeFFmpeg();
+    std::atomic<bool> m_isReadingVideo = false;
+    std::atomic<bool> m_isReadingAudio = false;
 
-    int64_t m_startTime = 0;
+    int64_t m_videoStartTime = 0;
+    int64_t m_audioStartTime = 0;
     // QMutex m_queueMutex;  // 保护队列指针访问的互斥锁
     QUEUE_DATA<AVPacketPtr> *m_videoPacketQueue = nullptr;
     QUEUE_DATA<AVPacketPtr> *m_audioPacketQueue = nullptr;
 
-    QMutex m_workMutex;
-    QWaitCondition m_workCond;
-    std::atomic<bool> m_isDoingWork = false;
+    // --- 两个独立的线程同步 ---
+    QMutex m_videoWorkMutex;
+    QWaitCondition m_videoWorkCond;
+    std::atomic<bool> m_isDoingVideoWork = false;
+
+    QMutex m_audioWorkMutex;
+    QWaitCondition m_audioWorkCond;
+    std::atomic<bool> m_isDoingAudioWork = false;
+
+    void startVideoReading();
+    void startAudioReading();
+    void stopVideoReading();
+    void stopAudioReading();
 
 signals:
     void deviceOpenSuccessfully(AVCodecParameters *vparams, AVCodecParameters *aparams, AVRational vTimeBase, AVRational aTimeBase);
-
     void errorOccurred(const QString &errorText);
-
+    void audioDeviceOpenSuccessfully(AVCodecParameters *aParams,AVRational m_aTimeBase);
+    void videoDeviceOpenSuccessfully(AVCodecParameters *m_vParams,AVRational m_vTimeBase);
 public slots:
-    void openDevice(const QString &videoDeviceName, const QString &audioDeviceName);
-
     void closeDevice();
 
-    void startReading();
-
-    void doReadFrame();
+    void configReadingStatus(bool openVideo, bool openAudio);
+    void doReadVideoFrame();
+    void doReadAudioFrame();
 
     void stopReading();
 
     void openAudio(const QString &audioDeviceName);
-
     void openVideo(const QString &videoDeviceName);
 
     void closeAudio();
-
     void closeVideo();
 };
 

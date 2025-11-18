@@ -5,16 +5,19 @@
  */
 #include <QMainWindow>
 #include "Capture.h"
-#include "ffmpegVideoDecoder.h"
+#include <QTimer>
 #include "VideoWidget.h"
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
 #include "ffmpegAudioDecoder.h"
+#include "ffmpegVideoDecoder.h"
 #include "ffmpegEncoder.h"
 #include "RtmpPublisher.h"
 #include "WebRTCPublisher.h"
 #include "RtmpPuller.h"
- 
+#include "logqueue.h"
+#include "log_global.h"
+#include "mytextedit.h"
 #include "screen.h"
 
 
@@ -48,7 +51,7 @@ private:
 
     Ui::MainWindow *ui;
     quint32 mainip; //主屏幕显示的IP图像
-
+    QTimer* m_displayTimer;
     // --- 采集 ---
     QThread *m_CaptureThread;
     Capture *m_Capture;
@@ -118,7 +121,8 @@ private slots:
 
     void handleError(const QString &errorText);
 
-    void onDeviceOpened(AVCodecParameters* vParams, AVCodecParameters* aParams, AVRational vTimeBase, AVRational aTimeBase);
+    void onAudioDeviceOpened(AVCodecParameters* aParams, AVRational aTimeBase);
+    void onVideoDeviceOpened(AVCodecParameters* vParams, AVRational vTimeBase);
 
     void onRtmpPullerInitSuccess() {
         // 只有在 init 成功后，才启动拉流
