@@ -182,15 +182,23 @@ bool ffmpegEncoder::initVideoEncoderH264(AVCodecParameters *vparams) {
     return true;
 }
 
+void ffmpegEncoder::ChangeEncodingState(bool isEncoding) { 
+    m_isEncoding = isEncoding;
+    if (m_isEncoding = true) {
+        startEncoding();
+    }
+    else {
+        stopEncoding();
+    }
+}
+
 void ffmpegEncoder::startEncoding() {
-    if (m_isEncoding) return;
-    m_isEncoding = true;
     QMetaObject::invokeMethod(this, "doEncodingWork", Qt::QueuedConnection);
     WRITE_LOG("Starting encoding process for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
 }
 
 void ffmpegEncoder::stopEncoding() {
-    m_isEncoding = false;
+    flushEncoder();
     WRITE_LOG("Stopping encoding process for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
 }
 
@@ -209,13 +217,13 @@ void ffmpegEncoder::doEncodingWork() { {
         // Assign PTS if missing and update internal counters
         if (m_mediaType == AVMEDIA_TYPE_VIDEO) {          
             frame->pts = m_videoFrameCounter++;
-            //if (m_forceKeyframe.exchange(false)) { // 获取并重置标志
-            //    WRITE_LOG("reset the fram to I frame");
-            //    frame->pict_type = AV_PICTURE_TYPE_I; //强制此帧为I帧
-            //}
-            //else {
-            //    frame->pict_type = AV_PICTURE_TYPE_NONE; //让编码器自行决定
-            //}
+            if (m_forceKeyframe.exchange(false)) { // 获取并重置标志
+                WRITE_LOG("reset the fram to I frame");
+                frame->pict_type = AV_PICTURE_TYPE_I; //强制此帧为I帧
+            }
+            else {
+                frame->pict_type = AV_PICTURE_TYPE_NONE; //让编码器自行决定
+            }
         } else if (m_mediaType == AVMEDIA_TYPE_AUDIO) {
             frame->pts = m_audioSamplesCount;
             m_audioSamplesCount += frame->nb_samples;
@@ -251,10 +259,6 @@ void ffmpegEncoder::doEncodingWork() { {
     work_guard();
     if (m_isEncoding) {
         QMetaObject::invokeMethod(this, "doEncodingWork", Qt::QueuedConnection);
-    } else {
-        // 如果在处理过程中收到了停止信号，则冲洗编码器
-        flushEncoder();
-        WRITE_LOG("Encoding loop finished for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
     }
 }
 
@@ -284,9 +288,6 @@ void ffmpegEncoder::flushEncoder() {
 }
 
 void ffmpegEncoder::clear() {
-    if (m_isEncoding) {
-        stopEncoding();
-    }
     {
         QMutexLocker locker(&m_workMutex);
         while (m_isDoingWork) {

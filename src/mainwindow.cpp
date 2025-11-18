@@ -265,8 +265,6 @@ void MainWindow::on_LiveStreamingBtn_clicked() {
     m_isRtmpPublishRequested = true;
     m_isWebRtcPublishRequested = false;
 
-    m_audioEncoderReady = false;
-    m_videoEncoderReady = false;
 
     if (m_videoParams) {
         qDebug("Initializing video pipeline(H264)");
@@ -289,10 +287,6 @@ void MainWindow::on_createmeetBtn_clicked() {
     m_isRtmpPublishRequested = false;
     m_isWebRtcPublishRequested = true;
 
-    m_audioEncoderReady = false;
-    m_videoEncoderReady = false;
-
-
     if (m_videoParams) {
         qDebug("Initializing video pipeline(H264)");
         QMetaObject::invokeMethod(m_videoEncoder, "initVideoEncoderH264", Qt::QueuedConnection,
@@ -307,14 +301,14 @@ void MainWindow::on_createmeetBtn_clicked() {
 
 void MainWindow::audioEncoderReady() {
     m_audioEncoderReady = true;
-    QMetaObject::invokeMethod(m_audioDecoder, "ChangeEncodingState",
+    QMetaObject::invokeMethod(m_audioEncoder, "ChangeEncodingState",
         Q_ARG(bool, m_audioEncoderReady));
     checkAndStartPublishing();//设置工厂，启动音频
 }
 
 void MainWindow::videoEncoderReady() {
     m_videoEncoderReady = true;
-    QMetaObject::invokeMethod(m_videoDecoder, "ChangeEncodingState",
+    QMetaObject::invokeMethod(m_videoEncoder, "ChangeEncodingState",
         Q_ARG(bool, m_videoEncoderReady));
     checkAndStartPublishing();
 }

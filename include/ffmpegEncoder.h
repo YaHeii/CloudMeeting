@@ -1,8 +1,4 @@
-﻿//
-// Created by lenovo on 25-9-13.
-//
-
-#ifndef FFMPEGENCODER_H
+﻿#ifndef FFMPEGENCODER_H
 #define FFMPEGENCODER_H
 
 #include <QObject>
@@ -63,7 +59,7 @@ public slots:
 
     bool initAudioEncoderAAC(AVCodecParameters *aparams);
     bool initAudioEncoderOpus(AVCodecParameters* aparams);
-
+    void ChangeEncodingState(bool isEncoding);
     void startEncoding();
 
     void stopEncoding();

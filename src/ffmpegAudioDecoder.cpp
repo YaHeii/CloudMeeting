@@ -172,7 +172,7 @@ void ffmpegAudioDecoder::doDecodingPacket() {
                     m_inputTimeBase);
                 m_fifoBasePts += duration;
                 // --- 入队给编码器 ---
-                if(m_isEncoding){
+                if(m_isDecoding){
                     m_frameQueue->enqueue(std::move(sendFrame));
 				}
             }
@@ -186,8 +186,8 @@ void ffmpegAudioDecoder::doDecodingPacket() {
 
 }
 
-void ffmpegAudioDecoder::ChangeEncodingState(bool isEncoding) {
-    m_isEncoding = isEncoding;
+void ffmpegAudioDecoder::ChangeDecodingState(bool isEncoding) {
+    m_isDecoding = isEncoding;
 }
 
 void ffmpegAudioDecoder::clear() {

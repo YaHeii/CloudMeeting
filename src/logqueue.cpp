@@ -101,7 +101,7 @@ extern "C" RTC_API void WRITE_RTC_LOG(rtcLogLevel level, const char* message) {
         // Note: the C API log level enum does not match our printf format, so convert level to string
         // We'll just forward message, and include numeric level
         "%d %s",
-        static_cast<int>(level),
+        static_cast<int>(level),// TODO
         message
     );
 }

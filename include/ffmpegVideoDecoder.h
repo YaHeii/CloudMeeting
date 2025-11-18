@@ -75,7 +75,7 @@ public slots:
 
     void stopDecoding();
     
-    void ChangeEncodingState(bool isEncoding);
+    void ChangeDecodingState(bool isEncoding);
 };
 
 

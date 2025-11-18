@@ -201,7 +201,7 @@ void ffmpegVideoDecoder::doDecodingPacket() {
     }
 }
 
-void ffmpegVideoDecoder::ChangeEncodingState(bool isEncoding){
+void ffmpegVideoDecoder::ChangeDecodingState(bool isEncoding){
         m_isEncoding = isEncoding;
 }
 
