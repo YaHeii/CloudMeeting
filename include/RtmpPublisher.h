@@ -32,7 +32,6 @@ private:
     QUEUE_DATA<AVPacketPtr> *m_encodedPacketQueue; // 编码后数据包的输入队列
 
     std::atomic<bool> m_isPublishing = false;
-
     AVFormatContext *m_outputFmtCtx = nullptr;
     AVStream *m_videoStream = nullptr;
     AVStream *m_audioStream = nullptr;
@@ -53,6 +52,7 @@ signals:
     void publisherStopped();
 
 public slots:
+    void ChangeRtmpPublishingState(bool isPublishing);
     void startPublishing();
 
     void stopPublishing();

@@ -180,29 +180,28 @@ void WebRTCPublisher::initializePeerConnection() {
     }
 }
 
-void WebRTCPublisher::startPublishing() {
+void WebRTCPublisher::ChangeWebRtcPublishingState(bool isPublishing) {
+    m_isPublishing = isPublishing;
     if (m_isPublishing) {
-        WRITE_LOG("WebRTC publisher is already running.");
-        return;
+        if (!m_peerConnection) {
+            emit errorOccurred("WebRTC publisher not initialized.");
+            return;
+        }
+        startPublishing();
+    } else {
+        stopPublishing();
     }
-    if (!m_peerConnection) {
-        emit errorOccurred("WebRTC publisher not initialized.");
-        return;
-    }
+}
 
-    m_isPublishing = true;
-    WRITE_LOG("Starting WebRTC Publishing");
-
+void WebRTCPublisher::startPublishing() {
     QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
+    WRITE_LOG("Starting WebRTC Publishing");
 }
 
 void WebRTCPublisher::stopPublishing() {
-    if (!m_isPublishing.load()) {
-        return;
-    }
-    m_isPublishing = false;
+    clear();
     WRITE_LOG("Stopping WebRTC publishing process...");
-    emit publisherStopped();
+
 }
 
 
@@ -350,12 +349,11 @@ void WebRTCPublisher::doPublishingWork() {
 }
 
 void WebRTCPublisher::clear() {
-    stopPublishing(); // Ensure the flag is set
 
     if (m_peerConnection) {
         m_peerConnection->close();
     }
-    // Let the unique_ptr handle deletion
+
     m_peerConnection.reset();
     m_videoTrack.reset();
     m_audioTrack.reset();

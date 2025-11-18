@@ -75,6 +75,7 @@ public slots:
     void onPLI_Received();
 
 private slots:
+    void ChangeWebRtcPublishingState(bool isPublishing);
     void doPublishingWork();
 
     void onSignalingReply(QNetworkReply *reply);

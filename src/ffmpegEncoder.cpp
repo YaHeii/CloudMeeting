@@ -152,16 +152,15 @@ bool ffmpegEncoder::initVideoEncoderH264(AVCodecParameters *vparams) {
     av_opt_set(m_codecCtx->priv_data, "preset", "ultrafast", 0);
     av_opt_set(m_codecCtx->priv_data, "tune", "zerolatency", 0);
     m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // 全局头
-    //m_codecCtx->level = 31; // Level 3.1
-    //m_codecCtx->refs = 1;   // 参考帧数
 
+    m_codecCtx->level = 31; // Level 3.1
+    m_codecCtx->refs = 1;   // 参考帧数
     //// 设置编码器参数
-    //AVDictionary* codec_options = nullptr;
-    //av_dict_set(&codec_options, "profile", "baseline", 0);
-
+    AVDictionary* codec_options = nullptr;
+    av_dict_set(&codec_options, "profile", "baseline", 0);
     //// 关键：确保输出格式符合WebRTC要求
-    //av_dict_set(&codec_options, "x264-params", "annexb=0:aud=1", 0); // AVCC格式，带AUD
-    //av_dict_set(&codec_options, "bsf", "h264_mp4toannexb", 0); // 转换为annexb格式
+    av_dict_set(&codec_options, "x264-params", "annexb=0:aud=1", 0); // AVCC格式，带AUD
+    av_dict_set(&codec_options, "bsf", "h264_mp4toannexb", 0); // 转换为annexb格式
 
     m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // 全局头
 

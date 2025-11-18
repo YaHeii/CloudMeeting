@@ -100,12 +100,22 @@ bool RtmpPublisher::init(const QString &rtmpUrl, AVCodecContext *vCodecCtx, AVCo
     return true;
 }
 
-void RtmpPublisher::startPublishing() {
-    if (m_isPublishing || !m_outputFmtCtx) {
-        WRITE_LOG("Publisher already started or not initialized.");
-        return;
+void RtmpPublisher::ChangeRtmpPublishingState(bool isPublishing) {
+    m_isPublishing = isPublishing;
+    if (m_isPublishing) {
+        if (m_isPublishing || !m_outputFmtCtx) {
+            WRITE_LOG("Publisher already started or not initialized.");
+            return;
+        }
+        startPublishing();
+    } else {
+        stopPublishing();
+        clear();
     }
-    m_isPublishing = true;
+}
+
+void RtmpPublisher::startPublishing() {
+
     emit publisherStarted();
     // 使用事件调用启动推流
     QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
@@ -113,13 +123,11 @@ void RtmpPublisher::startPublishing() {
 }
 
 void RtmpPublisher::stopPublishing() {
-    m_isPublishing = false;
     WRITE_LOG("Stopping RTMP publishing process...");
 }
 
 void RtmpPublisher::doPublishingWork() {
     if (!m_isPublishing) {
-        // 如果在事件到达之前就已经调用了stop，直接处理停止逻辑
         if (m_outputFmtCtx) {
             av_write_trailer(m_outputFmtCtx);
         }

@@ -320,7 +320,6 @@ void MainWindow::checkAndStartPublishing() {
     }
     if (m_isRtmpPublishRequested) {
         WRITE_LOG("Encoders ready, starting RTMP publish...");
-        m_isRtmpPublishRequested = false;
         AVCodecContext* videoCtx = m_videoEncoder->getCodecContext();
         AVCodecContext* audioCtx = m_audioEncoder->getCodecContext();
         if (!videoCtx || !audioCtx) {
@@ -332,19 +331,21 @@ void MainWindow::checkAndStartPublishing() {
         //// TODO: rtmpUrl 应该由服务器连接->text()指定
         QString rtmpUrl = "rtmp://127.0.0.1:1935/live/teststream";
         if (!QMetaObject::invokeMethod(m_rtmpPublisher, "init",
-            Qt::QueuedConnection,
-            Q_ARG(QString, rtmpUrl),
-            Q_ARG(AVCodecContext*, videoCtx),
-            Q_ARG(AVCodecContext*, audioCtx))) {
+                                        Qt::QueuedConnection,
+                                        Q_ARG(QString, rtmpUrl),
+                                        Q_ARG(AVCodecContext*, videoCtx),
+                                        Q_ARG(AVCodecContext*, audioCtx))) {
             WRITE_LOG("Failed to invoke RTMP publisher initialization.");
         }
         else {
-            QMetaObject::invokeMethod(m_rtmpPublisher, "startPublishing", Qt::QueuedConnection);
+            QMetaObject::invokeMethod(m_rtmpPublisher, "ChangeRtmpPublishingState", 
+                                      Q_ARG(bool, m_isRtmpPublishRequested),
+                                      Qt::QueuedConnection);
         }
+        m_isRtmpPublishRequested = false;
     }
     else if (m_isWebRtcPublishRequested) {
         WRITE_LOG("Encoders ready, starting WebRTC publish...");
-        m_isWebRtcPublishRequested = false;
         AVCodecContext* videoCtx = m_videoEncoder->getCodecContext();
         AVCodecContext* audioCtx = m_audioEncoder->getCodecContext();
         if (!videoCtx || !audioCtx) {
@@ -366,13 +367,15 @@ void MainWindow::checkAndStartPublishing() {
         QString webRTCstreamUrl = "http://172.24.73.45:1985/rtc/v1/whip/?app=live&stream=livestream";
 
         if (!QMetaObject::invokeMethod(m_webRTCPublisher, "init", Qt::QueuedConnection,
-            Q_ARG(QString, webRTCsignalingUrl),
-            Q_ARG(QString, webRTCstreamUrl))) {
+                                        Q_ARG(QString, webRTCsignalingUrl),
+                                        Q_ARG(QString, webRTCstreamUrl))) {
             WRITE_LOG("Failed to invoke WebRTC publisher initialization.");
+        } else {
+            QMetaObject::invokeMethod(m_webRTCPublisher, "ChangeWebRtcPublishingState", 
+                                      Q_ARG(bool, m_isWebRtcPublishRequested),
+                                      Qt::QueuedConnection);
         }
-        else {
-            QMetaObject::invokeMethod(m_webRTCPublisher, "startPublishing", Qt::QueuedConnection);
-        }
+        m_isWebRtcPublishRequested = false;
     }
 }
 
@@ -439,7 +442,6 @@ void MainWindow::onNewRemoteFrameAvailable() {
         }
     }
 }
-
 
 void MainWindow::handleError(const QString &errorText) {
     WRITE_LOG(errorText.toLocal8Bit());
