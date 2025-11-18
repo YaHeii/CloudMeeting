@@ -280,7 +280,7 @@ void Capture::doReadVideoFrame() {
 
     if (packet->stream_index == m_videoStreamIndex) {
         m_videoPacketQueue->enqueue(std::move(packet));
-        WRITE_LOG("Video frame read.");
+        //WRITE_LOG("Video frame read.");
     }
 
     work_guard();
@@ -364,7 +364,7 @@ void Capture::doReadAudioFrame() {
     if (packet->stream_index == m_audioStreamIndex) {
         m_audioPacketQueue->enqueue(std::move(packet));
     }
-
+    //WRITE_LOG("Audio frame read.");
     work_guard();
     if (m_isReadingAudio) {
         QMetaObject::invokeMethod(this, "doReadAudioFrame", Qt::QueuedConnection);

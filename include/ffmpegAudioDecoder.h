@@ -20,7 +20,6 @@ extern "C" {
 #include <libavutil/audio_fifo.h>
 }
 
-
 class ffmpegAudioDecoder : public QObject {
     Q_OBJECT
 
@@ -47,6 +46,7 @@ private:
     int64_t m_fifoBasePts = AV_NOPTS_VALUE;
 	AVRational m_inputTimeBase;
     AudioResampleConfig m_ResampleConfig;
+    
 
     // --- 线程同步 ---
     QMutex m_workMutex;
@@ -62,8 +62,6 @@ public slots:
     void startDecoding();
 
     void stopDecoding();
-
-    void setResampleConfig(const AudioResampleConfig &config);
 
     void doDecodingPacket();
 

@@ -10,6 +10,10 @@
 ffmpegAudioDecoder::ffmpegAudioDecoder(QUEUE_DATA<AVPacketPtr> *packetQueue, QUEUE_DATA<AVFramePtr> *frameQueue,
                                        QObject *parent)
     : QObject{parent}, m_packetQueue(packetQueue), m_frameQueue(frameQueue) {
+    m_ResampleConfig.frame_size = 1024;
+    m_ResampleConfig.sample_rate = 48000;
+    m_ResampleConfig.ch_layout = AV_CHANNEL_LAYOUT_MONO;
+    m_ResampleConfig.sample_fmt = AV_SAMPLE_FMT_FLTP;
 }
 
 ffmpegAudioDecoder::~ffmpegAudioDecoder() {
@@ -38,47 +42,33 @@ bool ffmpegAudioDecoder::init(AVCodecParameters *params, AVRational inputTimeBas
     }
     
     WRITE_LOG("Audio Decoder initialized successfully.");
-    return true;
 	m_inputTimeBase = inputTimeBase;
 
-}
-
-void ffmpegAudioDecoder::setResampleConfig(const AudioResampleConfig &config) {
-    WRITE_LOG("AudioDecoder received encoder config. Frame size: %d, Sample Rate: %d",
-              config.frame_size, config.sample_rate);
-    QMutexLocker locker(&m_workMutex);
-
-    m_ResampleConfig = config;
-
-    // --- 初始化重采样器 ---
     if (m_swrCtx) swr_free(&m_swrCtx);
 
     swr_alloc_set_opts2(&m_swrCtx,
-                        &config.ch_layout, // 目标通道布局
-                        config.sample_fmt, // 目标采样格式
-                        config.sample_rate, // 目标采样率
-                        &m_codecCtx->ch_layout, // 源通道布局
-                        m_codecCtx->sample_fmt, // 源采样格式
-                        m_codecCtx->sample_rate, // 源采样率
-                        0, nullptr);
+        &m_ResampleConfig.ch_layout,    // 目标通道布局
+        m_ResampleConfig.sample_fmt,  // 目标采样格式
+        m_ResampleConfig.sample_rate, // 目标采样率
+        &m_codecCtx->ch_layout, // 源通道布局
+        m_codecCtx->sample_fmt, // 源采样格式
+        m_codecCtx->sample_rate, // 源采样率
+        0, nullptr);
     if (!m_swrCtx || swr_init(m_swrCtx) < 0) {
-        emit errorOccurred("Failed to initialize audio resampler.");
-        return;
+        emit errorOccurred("Failed to initialize audio resampler in init.");
+        return false;
     }
 
-    // --- 初始化FIFO ---
     if (m_fifo) av_audio_fifo_free(m_fifo);
-    m_fifo = av_audio_fifo_alloc(config.sample_fmt, config.ch_layout.nb_channels, 1);
+    m_fifo = av_audio_fifo_alloc(m_ResampleConfig.sample_fmt, m_ResampleConfig.ch_layout.nb_channels, 1);
     if (!m_fifo) {
-        emit errorOccurred("Failed to allocate audio FIFO.");
-        return;
+        emit errorOccurred("Failed to allocate audio FIFO in init.");
+        return false;
     }
     m_fifoBasePts = AV_NOPTS_VALUE;
 
-    bool wasReady = m_isConfigReady.exchange(true);
-    if (!wasReady && m_isDecoding) {
-        QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
-    }
+    WRITE_LOG("Audio Decoder initialized successfully and is ready to resample.");
+    return true;
 }
 
 void ffmpegAudioDecoder::ChangeDecodingState(bool isEncoding) {
@@ -103,13 +93,6 @@ void ffmpegAudioDecoder::stopDecoding() {
 void ffmpegAudioDecoder::doDecodingPacket() {
     if (!m_isDecoding) {
         WRITE_LOG("Audio decoding loop finished.");
-        return;
-    }
-
-    if (!m_isConfigReady) {
-        WRITE_LOG("Audio decoder is waiting for resample configuration...");
-        // 可以设置一个定时器在一段时间后重试，或者完全依赖setResampleConfig的触发
-        // 这里我们选择后者，更高效
         return;
     }
 

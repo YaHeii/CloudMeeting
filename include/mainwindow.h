@@ -53,9 +53,11 @@ private:
     quint32 mainip; //主屏幕显示的IP图像
     QTimer* m_displayTimer;
     // --- 采集 ---
-    QThread *m_CaptureThread;
-    Capture *m_Capture;
     QUEUE_DATA<AVPacketPtr> *m_packetQueue; //采集队列
+    Capture* m_VideoCapture = nullptr;
+    QThread* m_VideoCaptureThread = nullptr;
+    Capture* m_AudioCapture = nullptr;
+    QThread* m_AudioCaptureThread = nullptr;
 
     // --- 视频处理链 ---
     ffmpegVideoDecoder *m_videoDecoder; 

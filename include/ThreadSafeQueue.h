@@ -56,7 +56,10 @@ public:
         m_notFullCond.wakeOne();
         return true;
     }
-
+    int size() {
+        QMutexLocker locker(&m_mutex);
+        return m_queue.size();
+    }
 
     void clear() {
         QMutexLocker locker(&m_mutex);

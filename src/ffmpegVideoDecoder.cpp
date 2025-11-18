@@ -143,7 +143,14 @@ void ffmpegVideoDecoder::doDecodingPacket() {
         sendFrame->pts = AV_NOPTS_VALUE;
     }
     if(m_isDecoding){
-        m_frameQueue->enqueue(std::move(sendFrame));
+        if (m_frameQueue->size() < 30) {
+            m_frameQueue->enqueue(std::move(sendFrame));
+        }
+        else {
+            // 队列满了（说明编码器没跑或太慢），丢弃这一帧以保护内存
+            // 这是一个"非阻塞"策略，防止影响预览
+            // WRITE_LOG("Warning: Encoder queue full, dropping frame to prevent memory bloat.");
+        }
     }
 
     bool formatChanged = (m_swsSrcWidth != m_codecCtx->width ||
@@ -186,12 +193,10 @@ void ffmpegVideoDecoder::doDecodingPacket() {
 
         QImage tempImage(m_rgbFrame->data[0], m_codecCtx->width, m_codecCtx->height, QImage::Format_RGB888);
         auto image = std::make_unique<QImage>(tempImage.copy()); //copy做深拷贝
-        m_QimageQueue->enqueue(std::move(image)); //添加到图片队列，用于QT渲染
-
-            //通知UI线程有新帧可用
-        //WRITE_LOG("New frame available.");
-        emit newFrameAvailable();
-
+        if (m_QimageQueue->size() < 5) { 
+            m_QimageQueue->enqueue(std::move(image));//添加到图片队列，用于QT渲染
+            emit newFrameAvailable();
+        }
     }
     av_frame_unref(decodedFrame.get());
 

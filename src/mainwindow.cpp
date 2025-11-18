@@ -48,14 +48,18 @@ MainWindow::MainWindow(QWidget *parent)
 	m_MainQimageQueue = new QUEUE_DATA<std::unique_ptr<QImage> >(); //拉流得到的显示队列，暂时不开启线程
 
     //// TODO: 创建工厂管理线程，加快启动速度
-    // 采集线程
-    m_CaptureThread = new QThread(this);
-    m_Capture = new Capture(m_videoPacketQueue, m_audioPacketQueue);
-    m_Capture->moveToThread(m_CaptureThread);
-    m_CaptureThread->start();
-    //// 采集器打开，发出信号携带解码参数
-    connect(m_Capture, &Capture::audioDeviceOpenSuccessfully, this, &MainWindow::onAudioDeviceOpened);
-    connect(m_Capture, &Capture::videoDeviceOpenSuccessfully, this, &MainWindow::onVideoDeviceOpened);
+    // 视频采集线程
+    m_VideoCaptureThread = new QThread(this);
+    m_VideoCapture = new Capture(m_videoPacketQueue, nullptr);
+    m_VideoCapture->moveToThread(m_VideoCaptureThread);
+    m_VideoCaptureThread->start();
+    connect(m_VideoCapture, &Capture::videoDeviceOpenSuccessfully, this, &MainWindow::onVideoDeviceOpened);
+    // 音频采集线程
+    m_AudioCaptureThread = new QThread(this);
+    m_AudioCapture = new Capture(nullptr, m_audioPacketQueue);
+    m_AudioCapture->moveToThread(m_AudioCaptureThread);
+    m_AudioCaptureThread->start();
+    connect(m_AudioCapture, &Capture::audioDeviceOpenSuccessfully, this, &MainWindow::onAudioDeviceOpened);
 
     //音频解码线程
     m_audioDecoderThread = new QThread(this);
@@ -115,21 +119,21 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_videoEncoder, &ffmpegEncoder::initializationSuccess, this, &MainWindow::videoEncoderReady);
 
     //// 音频
-    connect(m_audioEncoder, &ffmpegEncoder::audioEncoderReady, m_audioDecoder, &ffmpegAudioDecoder::setResampleConfig,
-            Qt::QueuedConnection);
     connect(m_audioEncoder, &ffmpegEncoder::initializationSuccess, this, &MainWindow::audioEncoderReady);
 
 
     //errorOccurred处理
     connect(m_videoDecoder, &ffmpegVideoDecoder::errorOccurred, this, &MainWindow::handleError);
+    connect(m_AudioCapture, &Capture::errorOccurred, this, &MainWindow::handleError);
     connect(m_audioDecoder, &ffmpegAudioDecoder::errorOccurred, this, &MainWindow::handleError);
     connect(m_audioEncoder, &ffmpegEncoder::errorOccurred, this, &MainWindow::handleError);
     connect(m_videoEncoder, &ffmpegEncoder::errorOccurred, this, &MainWindow::handleError);
-    connect(m_Capture, &Capture::errorOccurred, this, &MainWindow::handleError);
+    connect(m_VideoCapture, &Capture::errorOccurred, this, &MainWindow::handleError);
     connect(m_webRTCPublisher, &WebRTCPublisher::errorOccurred, this, &MainWindow::handleError);
     connect(m_rtmpPuller, &RtmpPuller::errorOccurred, this, &MainWindow::handleError);
     // 线程结束后，自动清理工作对象和线程本身
-    connect(m_CaptureThread, &QThread::finished, m_Capture, &QObject::deleteLater);
+    connect(m_VideoCaptureThread, &QThread::finished, m_VideoCapture, &QObject::deleteLater);    
+    connect(m_AudioCaptureThread, &QThread::finished, m_AudioCapture, &QObject::deleteLater);
     connect(m_videoDecoderThread, &QThread::finished, m_videoDecoder, &QObject::deleteLater);
     connect(m_audioDecoderThread, &QThread::finished, m_audioDecoder, &QObject::deleteLater);
     connect(m_audioEncoderThread, &QThread::finished, m_audioEncoder, &QObject::deleteLater);
@@ -138,11 +142,17 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 MainWindow::~MainWindow() {
-    // 停止采集
-    if (m_CaptureThread && m_CaptureThread->isRunning()) {
-        QMetaObject::invokeMethod(m_Capture, "closeDevice", Qt::BlockingQueuedConnection);
-        m_CaptureThread->quit();
-        m_CaptureThread->wait();
+    // 停止视频采集
+    if (m_VideoCaptureThread && m_VideoCaptureThread->isRunning()) {
+        QMetaObject::invokeMethod(m_VideoCapture, "closeDevice", Qt::BlockingQueuedConnection);
+        m_VideoCaptureThread->quit();
+        m_VideoCaptureThread->wait();
+    }
+    // 停止音频采集
+    if (m_AudioCaptureThread && m_AudioCaptureThread->isRunning()) {
+        QMetaObject::invokeMethod(m_AudioCapture, "closeDevice", Qt::BlockingQueuedConnection);
+        m_AudioCaptureThread->quit();
+        m_AudioCaptureThread->wait();
     }
 
     // 停止音频解码
@@ -190,7 +200,7 @@ MainWindow::~MainWindow() {
 //// 打开视频按钮（开关复用）
 void MainWindow::on_openVideo_clicked() {
     if (m_isVideoRunning) {
-        QMetaObject::invokeMethod(m_Capture, "closeVideo", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(m_VideoCapture, "closeVideo", Qt::QueuedConnection);
         ui->openVideo->setText("开启视频");
         m_isVideoRunning = false;
         qDebug() << "Video stopped.";
@@ -201,7 +211,7 @@ void MainWindow::on_openVideo_clicked() {
             qWarning() << "No video device selected!";
             return;
         }
-        QMetaObject::invokeMethod(m_Capture, "openVideo", Qt::QueuedConnection,Q_ARG(QString, videoDevice));
+        QMetaObject::invokeMethod(m_VideoCapture, "openVideo", Qt::QueuedConnection,Q_ARG(QString, videoDevice));
         ui->openVideo->setText("关闭视频");
         m_isVideoRunning = true;
         qDebug() << "Video started.";
@@ -212,9 +222,14 @@ void MainWindow::on_openVideo_clicked() {
 //// 打开麦克风按钮（开关复用）
 void MainWindow::on_openAudio_clicked() {
     if (m_isAudioRunning) {
-        QMetaObject::invokeMethod(m_Capture, "closeAudio", Qt::QueuedConnection);
-        ui->openAudio->setText("打开麦克风");
         m_isAudioRunning = false;
+
+        QMetaObject::invokeMethod(m_AudioCapture, "closeAudio", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(m_audioDecoder, "ChangeDecodingState", Qt::QueuedConnection,
+            Q_ARG(bool, m_isAudioRunning));
+        ui->openAudio->setText("打开麦克风");
+
+        
         qDebug() << "Audio stopped.";
         WRITE_LOG("Audio stopped.");
     } else {
@@ -223,9 +238,11 @@ void MainWindow::on_openAudio_clicked() {
             qWarning() << "No video device selected!";
             return;
         }
-        QMetaObject::invokeMethod(m_Capture, "openAudio", Qt::QueuedConnection,Q_ARG(QString, audioDevice));
-        ui->openAudio->setText("关闭麦克风");
         m_isAudioRunning = true;
+        QMetaObject::invokeMethod(m_AudioCapture, "openAudio", Qt::QueuedConnection,Q_ARG(QString, audioDevice));
+        QMetaObject::invokeMethod(m_audioDecoder, "ChangeDecodingState",
+            Q_ARG(bool, m_isAudioRunning), Qt::QueuedConnection);
+        ui->openAudio->setText("关闭麦克风");
         qDebug() << "Starting Audio.";
         WRITE_LOG("Starting Audio.");
     }
@@ -372,7 +389,7 @@ void MainWindow::on_joinmeetBtn_clicked() {
 
 //// 退出会议按钮
 void MainWindow::on_exitmeetBtn_clicked() {
-    QMetaObject::invokeMethod(m_Capture, "closeDevice", Qt::QueuedConnection);
+    //QMetaObject::invokeMethod(m_Capture, "closeDevice", Qt::QueuedConnection);
 }
 
 void MainWindow::onAudioDeviceOpened(AVCodecParameters* aParams, AVRational aTimeBase) {

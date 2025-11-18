@@ -260,7 +260,7 @@ void ffmpegEncoder::doEncodingWork() { {
         QMetaObject::invokeMethod(this, "doEncodingWork", Qt::QueuedConnection);
     }
 }
-
+// TODO:在其他的类中添加此逻辑
 void ffmpegEncoder::flushEncoder() {
     WRITE_LOG("Flushing encoder for %s...", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
     if (!m_codecCtx) return;
