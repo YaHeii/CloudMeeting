@@ -46,7 +46,6 @@ private:
     QWaitCondition m_workCond;
     bool m_isDoingWork = false;
 signals:
-    void audioEncoderReady(const AudioResampleConfig &config);
 
     void errorOccurred(const QString &errorText);
 
@@ -56,15 +55,14 @@ signals:
 
 public slots:
     bool initVideoEncoderH264(AVCodecParameters *vparams);
-
     bool initAudioEncoderAAC(AVCodecParameters *aparams);
     bool initAudioEncoderOpus(AVCodecParameters* aparams);
     void ChangeEncodingState(bool isEncoding);
     void startEncoding();
 
     void stopEncoding();
-
-    void doEncodingWork();
+    void doVideoEncodingWork();
+    void doAudioEncodingWork();
     void requestKeyFrame();
 };
 

@@ -196,13 +196,13 @@ void RtmpPublisher::doPublishingWork() {
     }
     bool is_video = (dest_stream == m_videoStream);
     const char* media_type = is_video ? "VIDEO" : "AUDIO";
-    qDebug() << "Attempting to write frame:"
-        << media_type
-        << "PTS:" << packet->pts
-        << "DTS:" << packet->dts
-        << "Size:" << packet->size
-        << "Stream:" << packet->stream_index
-        << "Keyframe:" << ((packet->flags & AV_PKT_FLAG_KEY) ? "Yes" : "No");
+    //qDebug() << "Attempting to write frame:"
+    //    << media_type
+    //    << "PTS:" << packet->pts
+    //    << "DTS:" << packet->dts
+    //    << "Size:" << packet->size
+    //    << "Stream:" << packet->stream_index
+    //    << "Keyframe:" << ((packet->flags & AV_PKT_FLAG_KEY) ? "Yes" : "No");
 
     int ret = av_interleaved_write_frame(m_outputFmtCtx, packet.get());
     if (ret < 0) {

@@ -104,7 +104,6 @@ void ffmpegAudioDecoder::doDecodingPacket() {
         }
         return;
     }
-
     {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = true;
@@ -122,59 +121,125 @@ void ffmpegAudioDecoder::doDecodingPacket() {
         m_isDecoding = false;
         return;
     }
-    if (avcodec_send_packet(m_codecCtx, packet.get()) == 0) {
-        while (avcodec_receive_frame(m_codecCtx, decoded_frame.get()) == 0) {
-            if (!m_isDecoding) break;
-            // 解码成功，进行重采样
-            resampledFrame->ch_layout = m_ResampleConfig.ch_layout;
-            resampledFrame->sample_rate = m_ResampleConfig.sample_rate;
-            resampledFrame->format = m_ResampleConfig.sample_fmt;
+    if (packet->size <= 0) {
+        WRITE_LOG("Warning: Received empty audio packet.");
+    }
+    int ret = avcodec_send_packet(m_codecCtx, packet.get());
+    if (ret < 0) {
+        char errbuf[1024] = { 0 };
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        WRITE_LOG("Error: avcodec_send_packet failed: %s", errbuf);
+    }
+    while (true) {
+        ret = avcodec_receive_frame(m_codecCtx, decoded_frame.get());
+        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+            break;
+        }
+        else if (ret < 0) {
+            WRITE_LOG("Error: avcodec_receive_frame failed: %s", ret);
+            break;
+        }
 
-            // 设置BasePts
-            //如果FIFO是空的，那么这个解码帧是音频流的起始帧，那么设置PTS为后续基准PTS
-            if (m_fifoBasePts == AV_NOPTS_VALUE && decoded_frame->pts != AV_NOPTS_VALUE) {
-                if (av_audio_fifo_size(m_fifo) == 0) {
-                    m_fifoBasePts = decoded_frame->pts;
-                }
-            }
+        ////检测音频通道布局,后期删除
+        if (decoded_frame->ch_layout.nb_channels > 0 &&
+            (decoded_frame->ch_layout.order == AV_CHANNEL_ORDER_UNSPEC || decoded_frame->ch_layout.u.mask == 0)) {
 
-            if (swr_convert_frame(m_swrCtx, resampledFrame.get(), decoded_frame.get()) < 0) continue;
+            // 既然不知道是什么，就按标准来：1声道=MONO，2声道=STEREO
+            av_channel_layout_default(&decoded_frame->ch_layout, decoded_frame->ch_layout.nb_channels);
+            // WRITE_LOG("Fixed audio channel layout for DirectShow input.");
+        }
 
-            // --- 写入FIFO ---
-            av_audio_fifo_write(m_fifo, (void **) resampledFrame->data, resampledFrame->nb_samples);
 
-            // --- 读取固定帧 ---
-            while (av_audio_fifo_size(m_fifo) >= m_ResampleConfig.frame_size) {
-                AVFramePtr sendFrame(av_frame_alloc());
-                sendFrame->pts = m_fifoBasePts;
-                // 设置帧参数
-                sendFrame->nb_samples = m_ResampleConfig.frame_size;
-                sendFrame->ch_layout = m_ResampleConfig.ch_layout;
-                sendFrame->format = m_ResampleConfig.sample_fmt;
-                sendFrame->sample_rate = m_ResampleConfig.sample_rate;
-
-                if (av_frame_get_buffer(sendFrame.get(), 0) < 0) break;
-
-                av_audio_fifo_read(m_fifo, (void **) sendFrame->data, m_ResampleConfig.frame_size);
-
-                // --- 计算PTS ---
-                int64_t duration = av_rescale_q(sendFrame->nb_samples,
-                    { 1, m_ResampleConfig.sample_rate },
-                    m_inputTimeBase);
-                m_fifoBasePts += duration;
-                // --- 入队给编码器 ---
-                if(m_isDecoding){
-                    m_frameQueue->enqueue(std::move(sendFrame));
-				}
+        // 设置BasePts
+        //如果FIFO是空的，那么这个解码帧是音频流的起始帧，那么设置PTS为后续基准PTS
+        if (m_fifoBasePts == AV_NOPTS_VALUE && decoded_frame->pts != AV_NOPTS_VALUE) {
+            if (av_audio_fifo_size(m_fifo) == 0) {
+                m_fifoBasePts = decoded_frame->pts;
+                WRITE_LOG("Audio Decoder Base PTS set to: %lld", m_fifoBasePts);
             }
         }
+        if (!m_swrCtx) {
+            swr_alloc_set_opts2(&m_swrCtx,
+                &m_ResampleConfig.ch_layout,
+                m_ResampleConfig.sample_fmt,
+                m_ResampleConfig.sample_rate,
+                &decoded_frame->ch_layout, // [关键] 使用 decoded_frame 的真实布局
+                (enum AVSampleFormat)decoded_frame->format, // [关键] 使用 decoded_frame 的真实格式
+                decoded_frame->sample_rate, // [关键] 使用 decoded_frame 的真实采样率
+                0, nullptr);
+
+            if (swr_init(m_swrCtx) < 0) {
+                WRITE_LOG("FATAL: Failed to init SwrContext with frame params.");
+                av_frame_unref(decoded_frame.get());
+                continue;
+            }
+            WRITE_LOG("SwrContext initialized with Frame: %d Hz, Fmt: %d", decoded_frame->sample_rate, decoded_frame->format);
+        }
+
+        resampledFrame->ch_layout = m_ResampleConfig.ch_layout;
+        resampledFrame->sample_rate = m_ResampleConfig.sample_rate;
+        resampledFrame->format = m_ResampleConfig.sample_fmt;
+
+        ret = swr_convert_frame(m_swrCtx, resampledFrame.get(), decoded_frame.get());
+
+        if (ret < 0) {
+            // [!! 自动恢复 !!] 如果转换失败，很可能是格式变了。
+            // 我们释放旧的 context，下次循环会通过上面的 if(!m_swrCtx) 重新创建
+            WRITE_LOG("Error: swr_convert_frame failed (ret=%d). Re-initializing SwrContext...", ret);
+            swr_free(&m_swrCtx);
+            m_swrCtx = nullptr;
+
+            av_frame_unref(decoded_frame.get());
+            continue; // 跳过这一帧，下一次会重新初始化
+        }
+
+
+        // --- 写入FIFO ---
+        if (resampledFrame->nb_samples > 0) {
+            int written = av_audio_fifo_write(m_fifo, (void**)resampledFrame->data, resampledFrame->nb_samples);
+            if (written < resampledFrame->nb_samples) {
+                WRITE_LOG("Warning: FIFO write truncated (Queue full?).");
+            }
+        }
+        av_frame_unref(resampledFrame.get());
+        // --- 读取固定帧 ---
+        while (av_audio_fifo_size(m_fifo) >= m_ResampleConfig.frame_size) {
+            AVFramePtr sendFrame(av_frame_alloc());
+            sendFrame->pts = m_fifoBasePts;
+            // 设置帧参数
+            sendFrame->nb_samples = m_ResampleConfig.frame_size;
+            sendFrame->ch_layout = m_ResampleConfig.ch_layout;
+            sendFrame->format = m_ResampleConfig.sample_fmt;
+            sendFrame->sample_rate = m_ResampleConfig.sample_rate;
+            sendFrame->pts = m_fifoBasePts;
+
+            if (av_frame_get_buffer(sendFrame.get(), 0) < 0) {
+                WRITE_LOG("Error: Failed to allocate buffer for sendFrame.");
+                break;
+            }
+
+            if (av_audio_fifo_read(m_fifo, (void**)sendFrame->data, m_ResampleConfig.frame_size) < m_ResampleConfig.frame_size) {
+                WRITE_LOG("Error: FIFO read failed.");
+                break;
+            };
+
+            // --- 计算PTS ---
+            int64_t duration = av_rescale_q(sendFrame->nb_samples,
+                { 1, m_ResampleConfig.sample_rate },
+                m_inputTimeBase);
+            m_fifoBasePts += duration;
+            //WRITE_LOG("Audio Decoder: Enqueuing frame (Size: %d)", sendFrame->nb_samples);
+            m_frameQueue->enqueue(std::move(sendFrame));
+        }
+        av_frame_unref(decoded_frame.get());
+        av_frame_unref(resampledFrame.get());
     }
     work_guard();
 
     if (m_isDecoding) {
         QMetaObject::invokeMethod(this, "doDecodingPacket", Qt::QueuedConnection);
-    }
 
+    }
 }
 
 

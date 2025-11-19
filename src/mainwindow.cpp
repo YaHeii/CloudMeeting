@@ -48,6 +48,8 @@ MainWindow::MainWindow(QWidget *parent)
 	m_MainQimageQueue = new QUEUE_DATA<std::unique_ptr<QImage> >(); //拉流得到的显示队列，暂时不开启线程
 
     //// TODO: 创建工厂管理线程，加快启动速度
+    // TODO: 创建视频与音频参数单例结构体，不传递vParams 和 aParams
+    // 音频采集线程
     // 视频采集线程
     m_VideoCaptureThread = new QThread(this);
     m_VideoCapture = new Capture(m_videoPacketQueue, nullptr);
@@ -331,9 +333,8 @@ void MainWindow::checkAndStartPublishing() {
             WRITE_LOG("Failed to invoke RTMP publisher initialization.");
         }
         else {
-            QMetaObject::invokeMethod(m_rtmpPublisher, "ChangeRtmpPublishingState", 
-                                      Q_ARG(bool, m_isRtmpPublishRequested),
-                                      Qt::QueuedConnection);
+            QMetaObject::invokeMethod(m_rtmpPublisher, "ChangeRtmpPublishingState", Qt::QueuedConnection,
+                                      Q_ARG(bool, m_isRtmpPublishRequested));
         }
         m_isRtmpPublishRequested = false;
     }

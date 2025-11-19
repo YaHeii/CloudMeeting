@@ -34,27 +34,12 @@ bool ffmpegEncoder::initAudioEncoderAAC(AVCodecParameters* aparams) {
         emit errorOccurred("Failed to allocate codec context.");
         return false;
     }
-    int sample_rate =48000;
-    int nb_channels =1;
-    if (aparams) {
-        if (aparams->sample_rate >0) sample_rate = aparams->sample_rate;
-        if (aparams->ch_layout.nb_channels >0) nb_channels = aparams->ch_layout.nb_channels;
-    }
 
-    m_codecCtx->sample_rate = sample_rate;
-    av_channel_layout_default(&m_codecCtx->ch_layout, nb_channels);
+    m_codecCtx->sample_rate = 48000; 
+    av_channel_layout_default(&m_codecCtx->ch_layout, 1); // 单声道
     m_codecCtx->sample_fmt = AV_SAMPLE_FMT_FLTP;
-    m_codecCtx->bit_rate =128000; //128 kbps
+    m_codecCtx->bit_rate = 64000;
     m_codecCtx->time_base = {1, m_codecCtx->sample_rate };
-
-    if (codec->id == AV_CODEC_ID_AAC) {
-        // nothing additional required for native aac
-    }
-    else {
-        // try to set some libfdk_aac options if used
-        if (av_opt_set(m_codecCtx->priv_data, "bitrate", "128000",0) <0) {
-        }
-    }
 
     m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
@@ -67,12 +52,6 @@ bool ffmpegEncoder::initAudioEncoderAAC(AVCodecParameters* aparams) {
     // reset audio samples counter
     m_audioSamplesCount =0;
 
-    AudioResampleConfig config;
-    config.frame_size = m_codecCtx->frame_size;
-    config.sample_rate = m_codecCtx->sample_rate;
-    config.sample_fmt = m_codecCtx->sample_fmt;
-    config.ch_layout = m_codecCtx->ch_layout;
-    emit audioEncoderReady(config);
     emit initializationSuccess();
     WRITE_LOG("Audio AAC encoder initialized successfully. Frame size: %d", m_codecCtx->frame_size);
     return true;
@@ -81,7 +60,6 @@ bool ffmpegEncoder::initAudioEncoderAAC(AVCodecParameters* aparams) {
 bool ffmpegEncoder::initAudioEncoderOpus(AVCodecParameters *aparams) {
 	WRITE_LOG("Initializing Audio Opus Encoder...");
     m_mediaType = AVMEDIA_TYPE_AUDIO;
-    // Prefer native AAC encoder if available
     const AVCodec *codec = avcodec_find_encoder_by_name("libopus");
     if (!codec) {
         emit errorOccurred("Codec opus not found.");
@@ -99,6 +77,8 @@ bool ffmpegEncoder::initAudioEncoderOpus(AVCodecParameters *aparams) {
     m_codecCtx->sample_fmt = AV_SAMPLE_FMT_FLTP; //浮点平面采样
     m_codecCtx->bit_rate = 48000;
     m_codecCtx->time_base = { 1, m_codecCtx->sample_rate };
+    m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+
     if (av_opt_set(m_codecCtx->priv_data, "application", "voip", 0) < 0) {
         //优化语音延迟
         emit errorOccurred("Failed to set Opus application to voip.");
@@ -112,12 +92,9 @@ bool ffmpegEncoder::initAudioEncoderOpus(AVCodecParameters *aparams) {
         emit errorOccurred("Failed to open audio codec.");
         return false;
     }
-    AudioResampleConfig config;
-    config.frame_size = m_codecCtx->frame_size;
-    config.sample_rate = m_codecCtx->sample_rate;
-    config.sample_fmt = m_codecCtx->sample_fmt;
-    config.ch_layout = m_codecCtx->ch_layout;
-    emit audioEncoderReady(config);
+
+    m_audioSamplesCount = 0;
+
     emit initializationSuccess();
 
     WRITE_LOG("Opus encoder initialized successfully. Frame size: %d", m_codecCtx->frame_size);
@@ -183,7 +160,7 @@ bool ffmpegEncoder::initVideoEncoderH264(AVCodecParameters *vparams) {
 
 void ffmpegEncoder::ChangeEncodingState(bool isEncoding) { 
     m_isEncoding = isEncoding;
-    if (m_isEncoding = true) {
+    if (m_isEncoding) {
         startEncoding();
     }
     else {
@@ -192,16 +169,28 @@ void ffmpegEncoder::ChangeEncodingState(bool isEncoding) {
 }
 
 void ffmpegEncoder::startEncoding() {
-    QMetaObject::invokeMethod(this, "doEncodingWork", Qt::QueuedConnection);
-    WRITE_LOG("Starting encoding process for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
+    if (m_mediaType == AVMEDIA_TYPE_VIDEO) {
+        WRITE_LOG("Starting Video Encoding Loop...");
+        QMetaObject::invokeMethod(this, "doVideoEncodingWork", Qt::QueuedConnection);
+    }
+    else {
+        WRITE_LOG("Starting Audio Encoding Loop...");
+        QMetaObject::invokeMethod(this, "doAudioEncodingWork", Qt::QueuedConnection);
+    }
 }
 
 void ffmpegEncoder::stopEncoding() {
     flushEncoder();
     WRITE_LOG("Stopping encoding process for %s", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
 }
+void ffmpegEncoder::doVideoEncodingWork() {
 
-void ffmpegEncoder::doEncodingWork() { {
+    if (!m_isEncoding) {
+        WRITE_LOG("Video encoding loop finished.");
+        return;
+    }
+
+    {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = true;
     }
@@ -209,57 +198,126 @@ void ffmpegEncoder::doEncodingWork() { {
         QMutexLocker locker(&m_workMutex);
         m_isDoingWork = false;
         m_workCond.wakeAll();
-    };
+        };
+
+
     AVFramePtr frame;
     if (m_frameQueue->dequeue(frame)) {
-        qDebug() << "Encoding frame by "<< m_codecCtx->codec->name;
-        // Assign PTS if missing and update internal counters
-        if (m_mediaType == AVMEDIA_TYPE_VIDEO) {          
-            frame->pts = m_videoFrameCounter++;
-            if (m_forceKeyframe.exchange(false)) { // 获取并重置标志
-                WRITE_LOG("reset the fram to I frame");
-                frame->pict_type = AV_PICTURE_TYPE_I; //强制此帧为I帧
-            }
-            else {
-                frame->pict_type = AV_PICTURE_TYPE_NONE; //让编码器自行决定
-            }
-        } else if (m_mediaType == AVMEDIA_TYPE_AUDIO) {
-            frame->pts = m_audioSamplesCount;
-            m_audioSamplesCount += frame->nb_samples;
+        // qDebug() << "Encoding Video frame: " << m_videoFrameCounter;
+
+        frame->pts = m_videoFrameCounter++;
+
+        if (m_forceKeyframe.exchange(false)) {// 获取并重置标志
+            WRITE_LOG("Requesting I-frame for video.");
+            frame->pict_type = AV_PICTURE_TYPE_I;//强制此帧为I帧
+        }
+        else {
+            frame->pict_type = AV_PICTURE_TYPE_NONE;//让编码器自行决定
         }
 
         int ret = avcodec_send_frame(m_codecCtx, frame.get());
-        if (ret <0) {
-            emit errorOccurred("Error sending frame to encoder.");
-        } else {
-            while (ret >=0) {
+        if (ret < 0) {
+            emit errorOccurred("Error sending video frame to encoder.");
+        }
+        else {
+            while (ret >= 0) {
                 AVPacketPtr packet(av_packet_alloc());
                 ret = avcodec_receive_packet(m_codecCtx, packet.get());
-                //WRITE_LOG("Encoding"); ////判断编码循环是否正常时开启
-                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {////数据空或编码结束
-                    break;
-                } else if (ret <0) {
-                    emit errorOccurred("Error receiving packet from encoder.");
+
+                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
                     break;
                 }
-                if (packet->size <= 0 || packet->data == nullptr || packet->pts == AV_NOPTS_VALUE) {
-                    WRITE_LOG("Encoder generated an invalid packet (size=%d, pts=%lld), dropping it.",
-                        packet->size, packet->pts);
-                    continue; // 丢弃这个包，继续尝试接收下一个
+                else if (ret < 0) {
+                    emit errorOccurred("Error receiving video packet.");
+                    break;
                 }
-                WRITE_LOG("Enqueuing packet: PTS=%lld, DTS=%lld, Size=%d, Key=%d",
-                           packet->pts, packet->dts, packet->size, (packet->flags & AV_PKT_FLAG_KEY));
-                packet->stream_index = (m_mediaType == AVMEDIA_TYPE_VIDEO) ?0 :1;
+
+                if (packet->size <= 0 || packet->data == nullptr || packet->pts == AV_NOPTS_VALUE){
+                    WRITE_LOG("Video Encoder generated an invalid packet (size=%d, pts=%lld), dropping it.",packet->size, packet->pts);
+                                            continue; // 丢弃这个包，继续尝试接收下一个
+                }
+
+                packet->stream_index = 0; // 视频流是 0
+                //WRITE_LOG("Enqueuing VIDEO packet: PTS=%lld, Size=%d, Key=%d",
+                //    packet->pts, packet->size, (packet->flags & AV_PKT_FLAG_KEY));
+
                 m_packetQueue->enqueue(std::move(packet));
             }
         }
     }
 
-    work_guard();
+
+    work_guard(); 
     if (m_isEncoding) {
-        QMetaObject::invokeMethod(this, "doEncodingWork", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, "doVideoEncodingWork", Qt::QueuedConnection);
     }
 }
+
+
+void ffmpegEncoder::doAudioEncodingWork() {
+    if (!m_isEncoding) {
+        WRITE_LOG("Audio encoding loop finished.");
+        return;
+    }
+
+    {
+        QMutexLocker locker(&m_workMutex);
+        m_isDoingWork = true;
+    }
+    auto work_guard = [this]() {
+        QMutexLocker locker(&m_workMutex);
+        m_isDoingWork = false;
+        m_workCond.wakeAll();
+        };
+
+    AVFramePtr frame;
+    if (m_frameQueue->dequeue(frame)) {
+
+        frame->pts = m_audioSamplesCount;
+        m_audioSamplesCount += frame->nb_samples;
+
+        int ret = avcodec_send_frame(m_codecCtx, frame.get());
+        if (ret < 0) {
+            char errbuf[1024] = { 0 };
+            av_strerror(ret, errbuf, sizeof(errbuf));
+            WRITE_LOG("Error sending audio frame: %s", errbuf);
+        }
+        else {
+            while (ret >= 0) {
+                AVPacketPtr packet(av_packet_alloc());
+                ret = avcodec_receive_packet(m_codecCtx, packet.get());
+
+                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+                    break;
+                }
+                else if (ret < 0) {
+                    emit errorOccurred("Error receiving audio packet.");
+                    break;
+                }
+
+                if (packet->size <= 0 || packet->data == nullptr || packet->pts == AV_NOPTS_VALUE) {
+                    WRITE_LOG("Audio Encoder generated an invalid packet (size=%d, pts=%lld), dropping it.", packet->size, packet->pts);
+                    continue; // 丢弃这个包，继续尝试接收下一个
+                }
+
+                packet->stream_index = 1; // 音频流是 1
+                //WRITE_LOG("Enqueuing AUDIO packet: PTS=%lld, Size=%d", packet->pts, packet->size);
+
+                m_packetQueue->enqueue(std::move(packet));
+            }
+        }
+    }
+    else {
+       //WRITE_LOG("No audio frame to encode.");//debug
+    }
+
+    work_guard();
+
+    if (m_isEncoding) {
+        QMetaObject::invokeMethod(this, "doAudioEncodingWork", Qt::QueuedConnection);
+    }
+} 
+
 // TODO:在其他的类中添加此逻辑
 void ffmpegEncoder::flushEncoder() {
     WRITE_LOG("Flushing encoder for %s...", (m_mediaType == AVMEDIA_TYPE_VIDEO ? "video" : "audio"));
