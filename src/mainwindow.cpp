@@ -387,6 +387,10 @@ void MainWindow::on_joinmeetBtn_clicked() {
     connect(m_rtmpPuller, &RtmpPuller::initSuccess, this, &MainWindow::onRtmpPullerInitSuccess);
     //QMetaObject::invokeMethod(m_rtmpPuller, "startPulling", Qt::QueuedConnection);
 }
+void MainWindow::onRtmpPullerInitSuccess() {
+    WRITE_LOG("RTMP puller initialized.");
+    QMetaObject::invokeMethod(m_rtmpPuller, "startPulling", Qt::QueuedConnection);
+}
 
 //// 退出会议按钮
 void MainWindow::on_exitmeetBtn_clicked() {
@@ -432,7 +436,7 @@ void MainWindow::onNewLocalFrameAvailable() {
 }
 
 void MainWindow::onNewRemoteFrameAvailable() {
-
+    WRITE_LOG("New remote frame available.");
     std::unique_ptr<QImage> image;
     if (m_MainQimageQueue->dequeue(image)) {
         if (image && !image->isNull()) {

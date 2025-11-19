@@ -144,7 +144,6 @@ void ffmpegAudioDecoder::doDecodingPacket() {
         if (decoded_frame->ch_layout.nb_channels > 0 &&
             (decoded_frame->ch_layout.order == AV_CHANNEL_ORDER_UNSPEC || decoded_frame->ch_layout.u.mask == 0)) {
 
-            // 既然不知道是什么，就按标准来：1声道=MONO，2声道=STEREO
             av_channel_layout_default(&decoded_frame->ch_layout, decoded_frame->ch_layout.nb_channels);
             // WRITE_LOG("Fixed audio channel layout for DirectShow input.");
         }

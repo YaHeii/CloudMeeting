@@ -167,14 +167,18 @@ void ffmpegEncoder::ChangeEncodingState(bool isEncoding) {
         stopEncoding();
     }
 }
-
+/// TODO:这里使用编码开始时清空队列来保证音视频同步，这是极为简化的做法，后期完善
 void ffmpegEncoder::startEncoding() {
     if (m_mediaType == AVMEDIA_TYPE_VIDEO) {
         WRITE_LOG("Starting Video Encoding Loop...");
         QMetaObject::invokeMethod(this, "doVideoEncodingWork", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, "doVideoEncodingWork", Qt::QueuedConnection);
     }
     else {
         WRITE_LOG("Starting Audio Encoding Loop...");
+        WRITE_LOG("Clearing stale audio frames from queue before starting...");
+        m_frameQueue->clear();
+        m_audioSamplesCount = 0;
         QMetaObject::invokeMethod(this, "doAudioEncodingWork", Qt::QueuedConnection);
     }
 }
@@ -238,8 +242,7 @@ void ffmpegEncoder::doVideoEncodingWork() {
                 }
 
                 packet->stream_index = 0; // 视频流是 0
-                //WRITE_LOG("Enqueuing VIDEO packet: PTS=%lld, Size=%d, Key=%d",
-                //    packet->pts, packet->size, (packet->flags & AV_PKT_FLAG_KEY));
+                //WRITE_LOG("Enqueuing VIDEO packet: PTS=%lld, Size=%d, Key=%d",packet->pts, packet->size, (packet->flags & AV_PKT_FLAG_KEY));
 
                 m_packetQueue->enqueue(std::move(packet));
             }

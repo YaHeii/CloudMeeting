@@ -46,11 +46,6 @@ RtmpPuller::~RtmpPuller() {
 
 
 
-void RtmpPuller::ChangePullingState(bool isPulling) {
-	m_isPulling = isPulling;
-
-}
-
 void RtmpPuller::init(QString RtmpUrl) {
 	m_fmtCtx = avformat_alloc_context();
 	if (!m_fmtCtx) {
@@ -116,7 +111,7 @@ void RtmpPuller::onStreamOpened_initVideo(AVCodecParameters* vParams, AVRational
 			Q_ARG(AVRational, vTimeBase)))
 		{
 			// 成功后，启动视频解码循环
-			QMetaObject::invokeMethod(m_videoDecoder, "startDecoding", Qt::QueuedConnection);
+			QMetaObject::invokeMethod(m_videoDecoder, "ChangeDecodingState", Qt::QueuedConnection,Q_ARG(bool,true));
 		}
 		else {
 			emit errorOccurred("RtmpPuller: Failed to invoke video init.");
@@ -142,7 +137,17 @@ void RtmpPuller::onStreamOpened_initAudio(AVCodecParameters* aParams, AVRational
 	}
 }
 
-
+//TODO：pull线程需要异步唤醒，函数需改进
+void RtmpPuller::ChangePullingState(bool isPulling) {
+	m_isPulling = isPulling;
+	if (m_isPulling) {
+		WRITE_LOG("RtmpPuller: Start pulling.");
+		startPulling();
+	}
+	else {
+		stopPulling();
+	}
+}
 void RtmpPuller::startPulling() {
 
 	if (m_isPulling) {
@@ -158,7 +163,7 @@ void RtmpPuller::startPulling() {
 }
 
 void RtmpPuller::doPullingWork() {
-	WRITE_LOG("doPullingWork clicked");
+	//WRITE_LOG("doPullingWork clicked");
 
 	if (!m_isPulling) {
 		WRITE_LOG("RtmpPuller: Stopping all threads...");
@@ -183,8 +188,6 @@ void RtmpPuller::doPullingWork() {
 		m_workCond.wakeAll();
 	};
 	int ret = 0;
-	qDebug() << "start to read frame";
-	qDebug() << m_fmtCtx;
 	if (ret = av_read_frame(m_fmtCtx, packet.get()) < 0) {
 		if (ret == AVERROR_EOF) {
 			WRITE_LOG("RtmpPuller: End of stream.");

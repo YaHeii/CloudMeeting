@@ -126,10 +126,7 @@ private slots:
     void onAudioDeviceOpened(AVCodecParameters* aParams, AVRational aTimeBase);
     void onVideoDeviceOpened(AVCodecParameters* vParams, AVRational vTimeBase);
 
-    void onRtmpPullerInitSuccess() {
-        // 只有在 init 成功后，才启动拉流
-        QMetaObject::invokeMethod(m_rtmpPuller, "startPulling", Qt::QueuedConnection);
-    }
+    void onRtmpPullerInitSuccess();
     void on_PLIReceived_webrtcPublisher() {
         WRITE_LOG("MainWindow recieve webrtcPublisher PLI signal");
         QMetaObject::invokeMethod(m_videoEncoder, "requestKeyFrame", Qt::QueuedConnection);

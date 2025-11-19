@@ -116,7 +116,6 @@ void RtmpPublisher::ChangeRtmpPublishingState(bool isPublishing) {
 void RtmpPublisher::startPublishing() {
 
     emit publisherStarted();
-    // 使用事件调用启动推流
     QMetaObject::invokeMethod(this, "doPublishingWork", Qt::QueuedConnection);
     WRITE_LOG("RTMP publishing process started...");
 }
@@ -165,12 +164,12 @@ void RtmpPublisher::doPublishingWork() {
     AVRational source_time_base;
 
     // 判断包的类型，并设置好目标流和源时间基
-    if (packet->stream_index == 0 && m_videoStream) {
+    if (packet->stream_index == 0) {
         // 视频流
         dest_stream = m_videoStream;
         source_time_base = m_videoEncoderTimeBase;
     }
-    else if (packet->stream_index == 1 && m_audioStream) {
+    else if (packet->stream_index == 1) {
         // 音频流
         dest_stream = m_audioStream;
         source_time_base = m_audioEncoderTimeBase;
@@ -196,51 +195,37 @@ void RtmpPublisher::doPublishingWork() {
     }
     bool is_video = (dest_stream == m_videoStream);
     const char* media_type = is_video ? "VIDEO" : "AUDIO";
-    //qDebug() << "Attempting to write frame:"
-    //    << media_type
-    //    << "PTS:" << packet->pts
-    //    << "DTS:" << packet->dts
-    //    << "Size:" << packet->size
-    //    << "Stream:" << packet->stream_index
-    //    << "Keyframe:" << ((packet->flags & AV_PKT_FLAG_KEY) ? "Yes" : "No");
-
+    //WRITE_LOG("Writing Packet: %s PTS: %lld DTS: %lld Size: %d",media_type, packet->pts, packet->dts, packet->size);
     int ret = av_interleaved_write_frame(m_outputFmtCtx, packet.get());
     if (ret < 0) {
         char errbuf[1024] = {0};
         av_strerror(ret, errbuf, sizeof(errbuf));
         WRITE_LOG("Error writing frame to RTMP stream: %s", errbuf);
 
-        WRITE_LOG("======= ERROR WRITING FRAME (ret=%d: %s) =======", ret, errbuf);
-        WRITE_LOG("Packet Media Type: %s", media_type);
-        WRITE_LOG("Packet Stream Index: %d (Target Stream Index: %d)", packet->stream_index, dest_stream->index);
-
-        // --- 时间戳诊断 ---
-        WRITE_LOG("Packet PTS: %lld", packet->pts);
-        WRITE_LOG("Packet DTS: %lld", packet->dts);
-        WRITE_LOG("Packet Duration: %lld", packet->duration);
-
-        // --- 时间基诊断 ---
-        WRITE_LOG("Source Encoder Time Base: %d/%d", source_time_base.num, source_time_base.den);
-        WRITE_LOG("Target Stream Time Base: %d/%d", dest_stream->time_base.num, dest_stream->time_base.den);
-
-        // --- 标志和大小诊断 ---
-        WRITE_LOG("Packet Size: %d bytes", packet->size);
-        WRITE_LOG("Packet Flags: %s", (packet->flags & AV_PKT_FLAG_KEY) ? "KEYFRAME" : "Not a keyframe");
-
-        // --- 关键性检查 ---
-        if (packet->dts < 0) {
-            WRITE_LOG("CRITICAL: Packet DTS is negative (%lld). This is almost always invalid after rescale!", packet->dts);
-        }
-        if (is_video && !(packet->flags & AV_PKT_FLAG_KEY)) {
-            WRITE_LOG("INFO: Writing a NON-KEYFRAME video packet. Did we send a keyframe first?");
-        }
-        if (is_video && packet->dts > packet->pts) {
-            WRITE_LOG("WARNING: Video Packet DTS (%lld) > PTS (%lld). This is impossible if you disabled B-frames (max_b_frames = 0).", packet->dts, packet->pts);
-        }
-
-        WRITE_LOG("====================================================");
-
-
+        //WRITE_LOG("======= ERROR WRITING FRAME (ret=%d: %s) =======", ret, errbuf);
+        //WRITE_LOG("Packet Media Type: %s", media_type);
+        //WRITE_LOG("Packet Stream Index: %d (Target Stream Index: %d)", packet->stream_index, dest_stream->index);
+        //// --- 时间戳诊断 ---
+        //WRITE_LOG("Packet PTS: %lld", packet->pts);
+        //WRITE_LOG("Packet DTS: %lld", packet->dts);
+        //WRITE_LOG("Packet Duration: %lld", packet->duration);
+        //// --- 时间基诊断 ---
+        //WRITE_LOG("Source Encoder Time Base: %d/%d", source_time_base.num, source_time_base.den);
+        //WRITE_LOG("Target Stream Time Base: %d/%d", dest_stream->time_base.num, dest_stream->time_base.den);
+        //// --- 标志和大小诊断 ---
+        //WRITE_LOG("Packet Size: %d bytes", packet->size);
+        //WRITE_LOG("Packet Flags: %s", (packet->flags & AV_PKT_FLAG_KEY) ? "KEYFRAME" : "Not a keyframe");
+        //// --- 关键性检查 ---
+        //if (packet->dts < 0) {
+        //    WRITE_LOG("CRITICAL: Packet DTS is negative (%lld). This is almost always invalid after rescale!", packet->dts);
+        //}
+        //if (is_video && !(packet->flags & AV_PKT_FLAG_KEY)) {
+        //    WRITE_LOG("INFO: Writing a NON-KEYFRAME video packet. Did we send a keyframe first?");
+        //}
+        //if (is_video && packet->dts > packet->pts) {
+        //    WRITE_LOG("WARNING: Video Packet DTS (%lld) > PTS (%lld). This is impossible if you disabled B-frames (max_b_frames = 0).", packet->dts, packet->pts);
+        //}
+        //WRITE_LOG("====================================================");
         emit errorOccurred("Failed to write frame, publisher may be disconnected.");
         if (m_outputFmtCtx) {
             av_write_trailer(m_outputFmtCtx);
@@ -262,9 +247,7 @@ void RtmpPublisher::doPublishingWork() {
     }
 }
 
-/// <summary>
-/// 彻底释放对象时调用
-/// </summary>
+
 void RtmpPublisher::clear() {
     stopPublishing();
     //增加同步等待
