@@ -68,9 +68,6 @@ void WebRTCPublisher::initializePeerConnection() {
         video.addSSRC(42, "video-send", "video-stream", "video-track");
         video.setDirection(rtc::Description::Direction::SendOnly);
         m_videoTrack = m_peerConnection->addTrack(video);
-        //m_videoTrack->onPli([this]() {
-        //    this->onPLI_Received(); // 确保这个绑定被执行了
-        //    });
         WRITE_LOG("Video track (H.264) added.");
 
 
@@ -92,7 +89,7 @@ void WebRTCPublisher::initializePeerConnection() {
         );
         // 创建 H.264 打包器  
         auto h264Packetizer = std::make_shared<rtc::H264RtpPacketizer>(
-            rtc::NalUnit::Separator::LongStartSequence,  // NAL 单元分隔符  (00 00 00 01)
+            rtc::NalUnit::Separator::StartSequence,  // NAL 单元分隔符  (00 00 00 01)
             VideortpConfig,
             rtc::H264RtpPacketizer::DefaultMaxFragmentSize  // 最大分片大小  
         );
@@ -133,15 +130,43 @@ void WebRTCPublisher::initializePeerConnection() {
                 default: return "Unknown";
                 }
                 };
-                WRITE_LOG("WebRTC PeerConnection state changed: %s", stateToString(state));
-
+            WRITE_LOG("WebRTC PeerConnection state changed: %s", stateToString(state));
+            QMetaObject::invokeMethod(this, [this, state]() {
                 if (state == rtc::PeerConnection::State::Connected) {
                     emit publisherStarted();
                     onPLI_Received();
-                } else if (state == rtc::PeerConnection::State::Failed) {
+                    if (m_pliTimer) {
+                        m_pliTimer->stop();
+                        m_pliTimer->deleteLater();
+                        m_pliTimer = nullptr;
+                    }
+                    m_pliTimer = new QTimer(this);
+                    connect(m_pliTimer, &QTimer::timeout, this, [this]() {
+                        static int count = 0;
+                        if (count++ < 30) {
+                            WRITE_LOG("WebRTC: Scheduled Keyframe Request (%d/5)", count);
+                            onPLI_Received();
+                        }
+                        else {
+                            m_pliTimer->stop();
+                            count = 0;
+                        }
+                        });
+                    m_pliTimer->start(1000);
+                }
+                else if (state == rtc::PeerConnection::State::Failed) {
                     emit errorOccurred("WebRTC connection failed.");
                     stopPublishing();
                 }
+                else if (state == rtc::PeerConnection::State::Closed ||
+                    state == rtc::PeerConnection::State::Disconnected) {
+                    if (m_pliTimer) {
+                        m_pliTimer->stop();
+                        m_pliTimer->deleteLater();
+                        m_pliTimer = nullptr;
+                    }
+                }
+            });
         });
 
         /// ICE State回调
@@ -316,16 +341,49 @@ void WebRTCPublisher::onSignalingReply(QNetworkReply *response) {
     });
 
 }
+std::vector<std::byte> normalizeH264StartCodes(const uint8_t* data, int size) {
+    std::vector<std::byte> buffer;
+    buffer.reserve(size + 16);
+
+    for (int i = 0; i < size; ) {
+        // 1. 优先检查 4 字节起始码 (00 00 00 01)
+        // 如果已经是 4 字节，直接拷贝，不做修改
+        if (i + 3 < size &&
+            data[i] == 0x00 && data[i + 1] == 0x00 && data[i + 2] == 0x00 && data[i + 3] == 0x01) {
+
+            buffer.push_back(std::byte(0x00));
+            buffer.push_back(std::byte(0x00));
+            buffer.push_back(std::byte(0x00));
+            buffer.push_back(std::byte(0x01));
+            i += 4; // 跳过这 4 个字节
+        }
+        // 2. 检查 3 字节起始码 (00 00 01)
+        // 只有是 3 字节时，才补一个 00
+        else if (i + 2 < size &&
+            data[i] == 0x00 && data[i + 1] == 0x00 && data[i + 2] == 0x01) {
+
+            buffer.push_back(std::byte(0x00));
+            buffer.push_back(std::byte(0x00));
+            buffer.push_back(std::byte(0x00)); // 补入 00
+            buffer.push_back(std::byte(0x01));
+            i += 3; // 跳过这 3 个字节
+        }
+        // 3. 普通数据
+        else {
+            buffer.push_back(std::byte(data[i]));
+            i++;
+        }
+    }
+    return buffer;
+}
 
 void WebRTCPublisher::doPublishingWork() {
     if (!m_isPublishing.load()) {
         WRITE_LOG("WebRTC publishing loop finished.");
-        clear();
         return;
     }
     if (!m_encodedPacketQueue) {
         WRITE_LOG("Encoded packet queue is null in doPublishingWork. Stopping publisher.");
-        clear();
         return;
     }
     AVPacketPtr packet;
@@ -333,11 +391,25 @@ void WebRTCPublisher::doPublishingWork() {
         // 使用 try_dequeue 避免阻塞
         try {
             if (packet->stream_index ==0 && m_videoTrack && m_videoTrack->isOpen()) {
-                WRITE_LOG("sending video packet, size: %d", packet->size);
-                m_videoTrack->send(reinterpret_cast<const std::byte *>(packet->data), packet->size);
+                auto normalizedData = normalizeH264StartCodes(packet->data, packet->size);
+                //m_videoTrack->send(
+                //    reinterpret_cast<const std::byte*>(packet->data),
+                //    packet->size
+                //);
+                m_videoTrack->send(normalizedData);
+ /*               if (packet->flags & AV_PKT_FLAG_KEY) {
+                    WRITE_LOG("WebRTC: Sent Video Keyframe (Original Size: %d, Sent: %d)",
+                        packet->size, normalizedData.size());
+                }*/
+                //WRITE_LOG("sending Video frame, Size: %d, frame = %s", packet->size, packet->flags);
+                //WRITE_LOG("sending Video frame");
+             
             } else if (packet->stream_index ==1 && m_audioTrack && m_audioTrack->isOpen()) {
-                WRITE_LOG("sending audio packet, size: %d", packet->size);
-                m_audioTrack->send(reinterpret_cast<const std::byte *>(packet->data), packet->size);
+                //WRITE_LOG("sending audio packet, size: %d", packet->size);
+                m_audioTrack->send(
+                    reinterpret_cast<const std::byte*>(packet->data),
+                    packet->size
+                );
             }
         } catch (const std::exception &e) {
             WRITE_LOG("Exception while sending packet: %s", e.what());

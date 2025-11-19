@@ -10,7 +10,7 @@
 ffmpegAudioDecoder::ffmpegAudioDecoder(QUEUE_DATA<AVPacketPtr> *packetQueue, QUEUE_DATA<AVFramePtr> *frameQueue,
                                        QObject *parent)
     : QObject{parent}, m_packetQueue(packetQueue), m_frameQueue(frameQueue) {
-    m_ResampleConfig.frame_size = 1024;
+    m_ResampleConfig.frame_size = 960;//BUG:AAC和opus对帧大小的要求不一致，考虑设置全局变量  AAC(RTMP):1024 opus(WebRTC):960
     m_ResampleConfig.sample_rate = 48000;
     m_ResampleConfig.ch_layout = AV_CHANNEL_LAYOUT_MONO;
     m_ResampleConfig.sample_fmt = AV_SAMPLE_FMT_FLTP;

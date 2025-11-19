@@ -365,9 +365,8 @@ void MainWindow::checkAndStartPublishing() {
                                         Q_ARG(QString, webRTCstreamUrl))) {
             WRITE_LOG("Failed to invoke WebRTC publisher initialization.");
         } else {
-            QMetaObject::invokeMethod(m_webRTCPublisher, "ChangeWebRtcPublishingState", 
-                                      Q_ARG(bool, m_isWebRtcPublishRequested),
-                                      Qt::QueuedConnection);
+            QMetaObject::invokeMethod(m_webRTCPublisher, "ChangeWebRtcPublishingState", Qt::QueuedConnection,
+                                         Q_ARG(bool, m_isWebRtcPublishRequested));
         }
         m_isWebRtcPublishRequested = false;
     }
@@ -462,4 +461,12 @@ void MainWindow::handleError(const QString &errorText) {
 
 void MainWindow::handleDeviceOpened() {
     qDebug() << "Main thread: Received device opened signal.";
+}
+void MainWindow::on_PLIReceived_webrtcPublisher() {
+    WRITE_LOG("WebRTC requested Keyframe (PLI). Forwarding to Encoder...");
+
+    // 告诉视频编码器：立即生成一个 IDR 帧
+    if (m_videoEncoder) {
+        QMetaObject::invokeMethod(m_videoEncoder, "requestKeyFrame", Qt::QueuedConnection);
+    }
 }

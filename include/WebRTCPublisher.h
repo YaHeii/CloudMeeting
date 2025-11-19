@@ -43,6 +43,7 @@ private:
 
     QUEUE_DATA<AVPacketPtr> *m_encodedPacketQueue;
     std::atomic<bool> m_isPublishing = false;
+    QTimer * m_pliTimer = nullptr;
 
     // --- WebRTC members ---
     std::unique_ptr<rtc::PeerConnection> m_peerConnection;

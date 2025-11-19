@@ -132,15 +132,17 @@ bool ffmpegEncoder::initVideoEncoderH264(AVCodecParameters *vparams) {
 
     m_codecCtx->level = 31; // Level 3.1
     m_codecCtx->refs = 1;   // 参考帧数
+
     //// 设置编码器参数
     AVDictionary* codec_options = nullptr;
     av_dict_set(&codec_options, "profile", "baseline", 0);
     //// 关键：确保输出格式符合WebRTC要求
-    av_dict_set(&codec_options, "x264-params", "annexb=0:aud=1", 0); // AVCC格式，带AUD
-    av_dict_set(&codec_options, "bsf", "h264_mp4toannexb", 0); // 转换为annexb格式
-
-    m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // 全局头
-
+    av_dict_set(&codec_options, "x264-params", "annexb=1:repeat_headers=1:aud=0", 0);
+    //BUG: WebRTC 的 RTP流通常要求 SPS/PPS 必须在 IDR 帧前面的 NALU 流中直接发送（In-Band）。
+    // RTMP 流要求 SPS/PPS 放在 RTMP 包的 Header 中，而不是 NALU 流中。
+    //m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // 全局头
+    //av_dict_set(&codec_options, "x264-params", "annexb=1:repeat_headers=1", 0);
+    //av_dict_set(&codec_options, "bsf", "h264_mp4toannexb", 0); // 转换为annexb格式
 
     if (avcodec_open2(m_codecCtx, codec, nullptr) <0) {
         emit errorOccurred("Failed to open video codec.");
@@ -235,7 +237,10 @@ void ffmpegEncoder::doVideoEncodingWork() {
                     emit errorOccurred("Error receiving video packet.");
                     break;
                 }
-
+                // 关键帧检测
+                //if (packet->flags & AV_PKT_FLAG_KEY) {
+                //    WRITE_LOG("Encoder output KEYFRAME (Size: %d, PTS: %lld)", packet->size, packet->pts);
+                //}
                 if (packet->size <= 0 || packet->data == nullptr || packet->pts == AV_NOPTS_VALUE){
                     WRITE_LOG("Video Encoder generated an invalid packet (size=%d, pts=%lld), dropping it.",packet->size, packet->pts);
                                             continue; // 丢弃这个包，继续尝试接收下一个
