@@ -128,7 +128,7 @@ bool ffmpegEncoder::initVideoEncoderH264(AVCodecParameters *vparams) {
     m_codecCtx->has_b_frames = 0;
     av_opt_set(m_codecCtx->priv_data, "preset", "ultrafast", 0);
     av_opt_set(m_codecCtx->priv_data, "tune", "zerolatency", 0);
-    m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // 全局头
+    //m_codecCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // 全局头
 
     m_codecCtx->level = 31; // Level 3.1
     m_codecCtx->refs = 1;   // 参考帧数
