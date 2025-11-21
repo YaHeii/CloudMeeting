@@ -39,7 +39,9 @@ add_executable(CloudMeeting
         src/WebRTCPublisher.cpp
         src/RtmpAudioPlayer.cpp
         src/RtmpPuller.cpp
-
+        src/RTPDepacketizer.cpp
+        src/rtp_jitter.cpp
+        src/WebRTCPuller.cpp
 
         include/AudioResampleConfig.h
         include/Capture.h
@@ -60,7 +62,9 @@ add_executable(CloudMeeting
         include/netheader.h
         include/RtmpAudioPlayer.h
         include/RtmpPuller.h
-
+        include/WebRTCPuller.h
+        include/RTPDepacketizer.h
+        include/rtp_jitter.h
  "include/WebRTCPuller.h" "src/WebRTCPuller.cpp")
 
 set_target_properties(CloudMeeting PROPERTIES

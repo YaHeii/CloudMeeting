@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QTimer>
 #include <QWaitCondition>
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
@@ -11,6 +12,10 @@
 #include "netheader.h"
 #include <QMessageBox>
 #include "AudioResampleConfig.h"
+#include <QNetworkReply>
+
+#include <rtc/peerconnection.hpp>
+#include <rtc/track.hpp>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -18,19 +23,32 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavformat/avformat.h>
 }
-class WebRTCPULLER : public QObject {
+class WebRTCPuller : public QObject {
     Q_OBJECT
 
 public:
-    explicit WebRTCPULLER(QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue, QObject* parent = nullptr);
+    explicit WebRTCPuller(QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue, QObject* parent = nullptr);
 
-    ~WebRTCPULLER();
-
-
+    ~WebRTCPuller();
 
     void stopPulling();
 private:
+    void initializePeerConnection();
+    void sendOfferToSignalingServer(const std::string& sdp);
+    void onSignalingReply(QNetworkReply* response);
+    void initCodecParams();
+    RTPDepacketizer* m_videoDepacketizer;
+    RTPDepacketizer* m_audioDepacketizer;
+    // --- WebRTC members ---
+    std::unique_ptr<rtc::PeerConnection> m_peerConnection;
+    std::shared_ptr<rtc::Track> m_videoTrack;
+    std::shared_ptr<rtc::Track> m_audioTrack;
+    rtc::Configuration m_rtcConfig;
 
+    // --- Signaling members ---
+    QNetworkAccessManager* m_networkManager;
+    QString m_signalingUrl;
+    QString m_streamUrl;
 
     AVCodecParameters* m_vParams = nullptr;
     AVCodecParameters* m_aParams = nullptr;
@@ -46,7 +64,7 @@ private:
     int m_videoStreamIndex = -1;
     int m_audioStreamIndex = -1;
 
-    QString m_rtmpPullerLink;
+    QString m_webrtcPuller;
     std::atomic<bool> m_isPulling = false;
     AVCodecContext* m_codecCtx = nullptr;
 
@@ -68,9 +86,9 @@ signals:
     void newFrameAvailable();
     void initSuccess();
 public slots:
-    void init(QString WebRTCUrl);
+    bool init(QString WebRTCUrl);
     void clear();
-    void startPulling();
+    void startPulling(); 
     void doPullingWork();
 
     void ChangePullingState(bool isDecoding);

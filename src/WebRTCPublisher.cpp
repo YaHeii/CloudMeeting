@@ -32,13 +32,13 @@ bool WebRTCPublisher::init(const QString &signalingUrl, const QString &streamUrl
 
     WRITE_LOG("Initializing WebRTC Publisher");
 
-    // 初始化dc日志系统，使用内置日志系统输出
-    rtc::InitLogger(rtc::LogLevel::Verbose, [](rtc::LogLevel level, rtc::string message) {
-        const char* file = "libdatachannel";
-        const char* function = "rtc_callback";
-        int line =0;
-        LogQueue::GetInstance().print(file, function, line, "%s", message.c_str());
-    });
+    //// 初始化dc日志系统，使用内置日志系统输出
+    //rtc::InitLogger(rtc::LogLevel::Verbose, [](rtc::LogLevel level, rtc::string message) {
+    //    const char* file = "libdatachannel";
+    //    const char* function = "rtc_callback";
+    //    int line =0;
+    //    LogQueue::GetInstance().print(file, function, line, "%s", message.c_str());
+    //});
 
     m_signalingUrl = signalingUrl;
     m_streamUrl = streamUrl;
@@ -376,7 +376,7 @@ std::vector<std::byte> normalizeH264StartCodes(const uint8_t* data, int size) {
     }
     return buffer;
 }
-
+//TODO:使用m_isDoingWork+cond条件保护推流线程
 void WebRTCPublisher::doPublishingWork() {
     if (!m_isPublishing.load()) {
         WRITE_LOG("WebRTC publishing loop finished.");

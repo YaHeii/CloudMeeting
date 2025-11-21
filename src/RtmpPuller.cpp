@@ -55,7 +55,7 @@ void RtmpPuller::init(QString RtmpUrl) {
 	m_rtmpPullerLink = RtmpUrl;
 	AVDictionary* opts = nullptr;
 	av_dict_set(&opts, "stimeout", "5000000", 0);
-	av_dict_set(&opts, "probesize", "4096", 0);
+	av_dict_set(&opts, "probesize", "32 * 1024", 0);// 设置探测数据大小.提高秒开效率。由4096->32*1024平衡低延迟
 
 	int ret = avformat_open_input(&m_fmtCtx, m_rtmpPullerLink.toStdString().c_str(), nullptr, &opts);
 	av_dict_free(&opts);
