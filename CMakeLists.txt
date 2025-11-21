@@ -61,7 +61,7 @@ add_executable(CloudMeeting
         include/RtmpAudioPlayer.h
         include/RtmpPuller.h
 
-)
+ "include/WebRTCPuller.h" "src/WebRTCPuller.cpp")
 
 set_target_properties(CloudMeeting PROPERTIES
     AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/ui"
