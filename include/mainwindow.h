@@ -19,7 +19,7 @@
 #include "log_global.h"
 #include "mytextedit.h"
 #include "screen.h"
-
+#include "WebRTCPuller.h"
 
 
 namespace Ui {
@@ -82,7 +82,7 @@ private:
     // --- 拉流 ---
     RtmpPuller *m_rtmpPuller; //RTMP拉流
     
-
+    WebRTCPuller *m_webRTCPuller;
 
     // --- 线程 ---
     QThread *m_videoDecoderThread;
@@ -92,6 +92,7 @@ private:
     QThread *m_rtmpPublisherThread;
     QThread *m_webRTCPublisherThread;
 	QThread* m_rtmpPullerThread;
+    QThread* m_webrtcPullerThread;
 
     VideoWidget *m_videoLocalWidget;
     VideoWidget *m_videoRemoteWidget;
@@ -127,6 +128,7 @@ private slots:
     void onVideoDeviceOpened(AVCodecParameters* vParams, AVRational vTimeBase);
 
     void onRtmpPullerInitSuccess();
+    void onWebRTCPullerInitSuccess();
     void on_PLIReceived_webrtcPublisher();
     void checkAndStartPublishing();//用于在编码器就绪启动推流
 };

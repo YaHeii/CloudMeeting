@@ -1,4 +1,4 @@
-#ifndef RTMPPULLER_H
+Ôªø#ifndef RTMPPULLER_H
 #define RTMPPULLER_H
 #include <QObject>
 #include <QString>
@@ -54,7 +54,7 @@ private:
     QThread* m_audioPlayThread = nullptr;
     RtmpAudioPlayer* m_audioPlayer = nullptr;
 
-    // --- œﬂ≥ÃÕ¨≤Ω ---
+    // --- Á∫øÁ®ãÂêåÊ≠• ---
     QMutex m_workMutex;
     QWaitCondition m_workCond;
     bool m_isDoingWork = false;

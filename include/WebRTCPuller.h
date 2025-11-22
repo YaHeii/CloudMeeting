@@ -1,5 +1,5 @@
-# ifndef WEBRTCPULLER
-# define WEBRTCPULLER
+Ôªø#ifndef WEBRTCPULLER_H
+#define WEBRTCPULLER_H
 
 #include <QObject>
 #include <QString>
@@ -8,21 +8,18 @@
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
 #include "RtmpAudioPlayer.h"
-#include "ffmpegVideoDecoder.h"
 #include "netheader.h"
+#include "ffmpegVideoDecoder.h"
 #include <QMessageBox>
 #include "AudioResampleConfig.h"
 #include <QNetworkReply>
-
+#include "RTPDepacketizer.h"
 #include <rtc/peerconnection.hpp>
 #include <rtc/track.hpp>
+#include "logqueue.h"
+#include "log_global.h"
+#include <QDebug>
 
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libswscale/swscale.h>
-#include <libavutil/imgutils.h>
-#include <libavformat/avformat.h>
-}
 class WebRTCPuller : public QObject {
     Q_OBJECT
 
@@ -31,14 +28,17 @@ public:
 
     ~WebRTCPuller();
 
-    void stopPulling();
 private:
-    void initializePeerConnection();
     void sendOfferToSignalingServer(const std::string& sdp);
-    void onSignalingReply(QNetworkReply* response);
+
     void initCodecParams();
+
+    void stopPulling();
+
     RTPDepacketizer* m_videoDepacketizer;
     RTPDepacketizer* m_audioDepacketizer;
+
+
     // --- WebRTC members ---
     std::unique_ptr<rtc::PeerConnection> m_peerConnection;
     std::shared_ptr<rtc::Track> m_videoTrack;
@@ -73,7 +73,7 @@ private:
     QThread* m_audioPlayThread = nullptr;
     RtmpAudioPlayer* m_audioPlayer = nullptr;
 
-    // --- œﬂ≥ÃÕ¨≤Ω ---
+    // --- Á∫øÁ®ãÂêåÊ≠• ---
     QMutex m_workMutex;
     QWaitCondition m_workCond;
     bool m_isDoingWork = false;
@@ -89,10 +89,9 @@ public slots:
     bool init(QString WebRTCUrl);
     void clear();
     void startPulling(); 
-    void doPullingWork();
-
+    void onSignalingReply(QNetworkReply* response);
     void ChangePullingState(bool isDecoding);
-
+    void initializePeerConnection();
     void onStreamOpened_initVideo(AVCodecParameters* vParams, AVRational vTimeBase);
 
     void onStreamOpened_initAudio(AVCodecParameters* aParams, AVRational aTimeBase);

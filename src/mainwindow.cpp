@@ -97,7 +97,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_webRTCPublisher->moveToThread(m_webRTCPublisherThread);
     m_webRTCPublisherThread->start();
     QMetaObject::invokeMethod(m_webRTCPublisher, "initThread", Qt::QueuedConnection);// 为了初始化libdatachannel
-    connect(m_webRTCPublisher, &WebRTCPublisher::PLIReceived, this, &MainWindow::on_PLIReceived_webrtcPublisher, Qt::QueuedConnection);//处理RTC->RTMP转码时的PLI请求
+    //connect(m_webRTCPublisher, &WebRTCPublisher::PLIReceived, this, &MainWindow::on_PLIReceived_webrtcPublisher, Qt::QueuedConnection);//处理RTC->RTMP转码时的PLI请求
 
     // RTMP拉流
     m_rtmpPullerThread = new QThread(this);
@@ -105,6 +105,14 @@ MainWindow::MainWindow(QWidget *parent)
     m_rtmpPuller->moveToThread(m_rtmpPullerThread);
     m_rtmpPullerThread->start();
     connect(m_rtmpPuller, &RtmpPuller::newFrameAvailable, this, &MainWindow::onNewRemoteFrameAvailable, Qt::QueuedConnection);
+
+    //WebRTC拉流
+    m_webrtcPullerThread = new QThread(this);
+    m_webRTCPuller = new WebRTCPuller(m_MainQimageQueue);
+    m_webRTCPuller->moveToThread(m_webrtcPullerThread);
+    m_webrtcPullerThread->start();
+    QMetaObject::invokeMethod(m_webRTCPublisher, "initThread", Qt::QueuedConnection);// 为了初始化libdatachannel
+    connect(m_webRTCPuller, &WebRTCPuller::newFrameAvailable, this, &MainWindow::onNewRemoteFrameAvailable, Qt::QueuedConnection);
 
     //获取可用设备
     QStringList videoDevices = DeviceEnumerator::getDevices(MediaType::Video);
@@ -376,21 +384,31 @@ void MainWindow::checkAndStartPublishing() {
 //// 加入房间按钮
 void MainWindow::on_joinmeetBtn_clicked() {
     qDebug() << "on_joinmeetBtn_clicked";
-    WRITE_LOG("Joining meeting");
-    QString rtmpUrl = "rtmp://127.0.0.1:1935/live/teststream";
-    //QString rtmpUrl = ui->meetnum->text();
-    if (!rtmpUrl.isEmpty()) {
-        QMetaObject::invokeMethod(m_rtmpPuller, "init", Qt::QueuedConnection,
-                                  Q_ARG(QString, rtmpUrl));
+    //WRITE_LOG("Joining meeting");
+    //QString rtmpUrl = "rtmp://127.0.0.1:1935/live/teststream";
+    ////QString rtmpUrl = ui->meetnum->text();
+    //if (!rtmpUrl.isEmpty()) {
+    //    QMetaObject::invokeMethod(m_rtmpPuller, "init", Qt::QueuedConnection,
+    //                              Q_ARG(QString, rtmpUrl));
+    //}
+    //connect(m_rtmpPuller, &RtmpPuller::initSuccess, this, &MainWindow::onRtmpPullerInitSuccess);
+
+    WRITE_LOG("WebRTC Joining meeting");
+    QString WebRTCUrl = "http://172.24.73.45:1985/rtc/v1/whep/?app=live&stream=livestream";
+    if (!WebRTCUrl.isEmpty()) {
+        QMetaObject::invokeMethod(m_webRTCPuller, "init", Qt::QueuedConnection,
+                                  Q_ARG(QString, WebRTCUrl));
+        connect(m_webRTCPuller, &WebRTCPuller::initSuccess, this, &MainWindow::onWebRTCPullerInitSuccess);
     }
-    connect(m_rtmpPuller, &RtmpPuller::initSuccess, this, &MainWindow::onRtmpPullerInitSuccess);
-    //QMetaObject::invokeMethod(m_rtmpPuller, "startPulling", Qt::QueuedConnection);
 }
 void MainWindow::onRtmpPullerInitSuccess() {
     WRITE_LOG("RTMP puller initialized.");
     QMetaObject::invokeMethod(m_rtmpPuller, "startPulling", Qt::QueuedConnection);
 }
-
+void MainWindow::onWebRTCPullerInitSuccess() {
+    WRITE_LOG("WebRTC puller initialized.");
+    QMetaObject::invokeMethod(m_webRTCPuller, "initializePeerConnection", Qt::QueuedConnection);
+}
 //// 退出会议按钮
 void MainWindow::on_exitmeetBtn_clicked() {
     //QMetaObject::invokeMethod(m_Capture, "closeDevice", Qt::QueuedConnection);

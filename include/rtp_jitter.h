@@ -88,7 +88,7 @@ private:
     uint16                  _last_pop_sequence;
     bool                    _buffering;             // while buffering, don't pop packets
 
-    timepoint               _buffering_timestamp;   // the time we start buffering
+    timepoint              _buffering_timestamp;   // the time we start buffering
 
     struct stats {
         uint32      ooo_count;          // count of out of order packets

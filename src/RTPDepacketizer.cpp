@@ -1,44 +1,44 @@
-#include "RTPDepacketizer.h"
-#include <winsock.h>
+ï»¿#include "RTPDepacketizer.h"
+#include <winsock2.h>
 extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
-RTPDepacketizer::RTPDepacketizer(int sampleRate, QUEUE_DATA<AVPacketPtr>* outputQueue, bool isH264, QObject* parent = nullptr)
+RTPDepacketizer::RTPDepacketizer(int sampleRate, QUEUE_DATA<AVPacketPtr>* outputQueue, bool isH264, QObject* parent)
     : QObject(parent), m_outputQueue(outputQueue),m_isH264(isH264)
 {
-    // Éè¶¨»º³åÉî¶È£¬ÀıÈç 200ms¡£Õâ¾ö¶¨ÁË¿¹¶¶¶¯ÄÜÁ¦ºÍÑÓ³Ù¡£
+    // è®¾å®šç¼“å†²æ·±åº¦ï¼Œä¾‹å¦‚ 200msã€‚è¿™å†³å®šäº†æŠ—æŠ–åŠ¨èƒ½åŠ›å’Œå»¶è¿Ÿã€‚
     m_jitterBuffer = new RTPJitter(200, sampleRate);
 
-    // Æô¶¯Ò»¸ö¶¨Ê±Æ÷À´Çı¶¯Êı¾İ "Á÷³ö"
-    // Jitter Buffer µÄºËĞÄÊÇ "ÑÓÊ±Êä³ö"£¬ËùÒÔĞèÒª¶¨Ê±È¥È¡
+    // å¯åŠ¨ä¸€ä¸ªå®šæ—¶å™¨æ¥é©±åŠ¨æ•°æ® "æµå‡º"
+    // Jitter Buffer çš„æ ¸å¿ƒæ˜¯ "å»¶æ—¶è¾“å‡º"ï¼Œæ‰€ä»¥éœ€è¦å®šæ—¶å»å–
     m_consumerTimer = new QTimer(this);
 
     connect(m_consumerTimer, &QTimer::timeout, this, &RTPDepacketizer::processPop);
 
 
-    m_consumerTimer->start(10); // Ã¿ 10ms ³¢ÊÔÈ¡Ò»´ÎÊı¾İ
+    m_consumerTimer->start(10); // æ¯ 10ms å°è¯•å–ä¸€æ¬¡æ•°æ®
 }
 
 RTPDepacketizer::~RTPDepacketizer() {
     delete m_jitterBuffer;
 }
 
-// ¡¾Éú²úÕß¡¿ÍøÂçÏß³Ìµ÷ÓÃ£ºÍÆÈëÊı¾İ
+// ã€ç”Ÿäº§è€…ã€‘ç½‘ç»œçº¿ç¨‹è°ƒç”¨ï¼šæ¨å…¥æ•°æ®
 void RTPDepacketizer::pushPacket(const uint8_t* data, size_t len) {
-    // 1. ·â×°³É¿âĞèÒªµÄ¶ÔÏó
-    // ×¢Òâ£ºRTPPacket ¹¹Ôìº¯Êı»á·¢ÉúÒ»´ÎÄÚ´æ¿½±´£¬ÕâÊÇ±ØÒªµÄ
+    // 1. å°è£…æˆåº“éœ€è¦çš„å¯¹è±¡
+    // æ³¨æ„ï¼šRTPPacket æ„é€ å‡½æ•°ä¼šå‘ç”Ÿä¸€æ¬¡å†…å­˜æ‹·è´ï¼Œè¿™æ˜¯å¿…è¦çš„
     rawrtp_ptr packet = std::make_shared<RTPPacket>((uint8_t*)data, len);
 
-    // 2. ¹Ø¼üĞŞÕı£ºÉèÖÃ Payload Ê±¼ä
-    // ¸Ã¿âÒÀÀµ payload_ms ¼ÆËã»º³åÇøÉî¶È¡£
-    // H.264 Ò»Ö¡¿ÉÄÜ·ÖºÜ¶à°ü£¬µ¥¸ö°üÊ±¼äºÜÄÑ½ç¶¨¡£
-    // ²ßÂÔ£º¼òµ¥¸ø¸ö 0 »ò 1£¬Ö÷ÒªÒÀÀµ¿âµÄ Timestamp ²îÖµÂß¼­¼´¿É£¬
-    // »òÕß¼òµ¥´Ö±©ÈÏÎªÃ¿¸ö°ü´ú±í 0ms (ÒòÎªÖ»ÊÇ·ÖÆ¬)£¬Ö»ÓĞÍêÕûÖ¡²ÅÓĞÊ±¼ä¡£
-    // ¿âÔ´ÂëÖĞ _depth_ms »áÀÛ¼ÓÕâ¸öÖµ¡£ÎªÁË±ÜÃâ overflow Âß¼­ÎóÅĞ£¬½¨ÒéÉèÎª 0¡£
+    // 2. å…³é”®ä¿®æ­£ï¼šè®¾ç½® Payload æ—¶é—´
+    // è¯¥åº“ä¾èµ– payload_ms è®¡ç®—ç¼“å†²åŒºæ·±åº¦ã€‚
+    // H.264 ä¸€å¸§å¯èƒ½åˆ†å¾ˆå¤šåŒ…ï¼Œå•ä¸ªåŒ…æ—¶é—´å¾ˆéš¾ç•Œå®šã€‚
+    // ç­–ç•¥ï¼šç®€å•ç»™ä¸ª 0 æˆ– 1ï¼Œä¸»è¦ä¾èµ–åº“çš„ Timestamp å·®å€¼é€»è¾‘å³å¯ï¼Œ
+    // æˆ–è€…ç®€å•ç²—æš´è®¤ä¸ºæ¯ä¸ªåŒ…ä»£è¡¨ 0ms (å› ä¸ºåªæ˜¯åˆ†ç‰‡)ï¼Œåªæœ‰å®Œæ•´å¸§æ‰æœ‰æ—¶é—´ã€‚
+    // åº“æºç ä¸­ _depth_ms ä¼šç´¯åŠ è¿™ä¸ªå€¼ã€‚ä¸ºäº†é¿å… overflow é€»è¾‘è¯¯åˆ¤ï¼Œå»ºè®®è®¾ä¸º 0ã€‚
     packet->payload_ms = 0;
 
-    // 3. ÍÆÈë Jitter Buffer
+    // 3. æ¨å…¥ Jitter Buffer
     m_jitterBuffer->push(packet);
 }
 
@@ -46,44 +46,44 @@ void RTPDepacketizer::pushPacket(const uint8_t* data, size_t len) {
 void RTPDepacketizer ::processPop() {
     rawrtp_ptr packet;
 
-    // Ñ­»·È¡³öËùÓĞ¿ÉÓÃµÄ°ü
+    // å¾ªç¯å–å‡ºæ‰€æœ‰å¯ç”¨çš„åŒ…
     while (true) {
         RTPJitter::RESULT res = m_jitterBuffer->pop(packet);
 
         if (res == RTPJitter::SUCCESS) {
-            // === ³É¹¦È¡³öÒ»¸öÓĞĞò°ü ===
-            // packet->pData ÊÇÍêÕûµÄ RTP °ü£¨º¬ Header£©
-            // packet->nLen ÊÇ³¤¶È
+            // === æˆåŠŸå–å‡ºä¸€ä¸ªæœ‰åºåŒ… ===
+            // packet->pData æ˜¯å®Œæ•´çš„ RTP åŒ…ï¼ˆå« Headerï¼‰
+            // packet->nLen æ˜¯é•¿åº¦
 
-            // 1. Ìø¹ı RTP Header »ñÈ¡ Payload
-            // ¸Ã¿âÌá¹©ÁË helper µ«ÎÒÃÇÊÖ¶¯Ëã¸üÎÈ£ºRTP Header ×îĞ¡ 12 ×Ö½Ú
-            // ÑÏ½÷×ö·¨ÊÇ½âÎö Header ¿´ÊÇ·ñÓĞ Extension (CC, X bit)
-            // ÕâÀï¼òµ¥¸´ÓÃÖ®Ç°µÄÂß¼­£¬»òÕß½âÎöµÚÒ»¸ö×Ö½Ú
+            // 1. è·³è¿‡ RTP Header è·å– Payload
+            // è¯¥åº“æä¾›äº† helper ä½†æˆ‘ä»¬æ‰‹åŠ¨ç®—æ›´ç¨³ï¼šRTP Header æœ€å° 12 å­—èŠ‚
+            // ä¸¥è°¨åšæ³•æ˜¯è§£æ Header çœ‹æ˜¯å¦æœ‰ Extension (CC, X bit)
+            // è¿™é‡Œç®€å•å¤ç”¨ä¹‹å‰çš„é€»è¾‘ï¼Œæˆ–è€…è§£æç¬¬ä¸€ä¸ªå­—èŠ‚
             size_t headerLen = 12;
             if (packet->nLen > 0) {
                 uint8_t vpxcc = packet->pData[0];
                 int csrcCount = vpxcc & 0x0F;
                 headerLen += (csrcCount * 4);
-                // Ôİ²»´¦Àí Extension bit (X) µÄ¸´ÔÓÇé¿ö£¬Í¨³£ WebRTC ÊÓÆµÁ÷»áÓĞ Extension
-                // ½¨ÒéÊ¹ÓÃ¿â×Ô´øµÄ helper (ËäÈ»ËüÊÇ private µÄ£¬¿ÉÄÜĞèÒªÉÔÎ¢¸ÄÒ»ÏÂ¿â±©Â¶³öÀ´£¬»òÕß×Ô¼ºĞ´)
+                // æš‚ä¸å¤„ç† Extension bit (X) çš„å¤æ‚æƒ…å†µï¼Œé€šå¸¸ WebRTC è§†é¢‘æµä¼šæœ‰ Extension
+                // å»ºè®®ä½¿ç”¨åº“è‡ªå¸¦çš„ helper (è™½ç„¶å®ƒæ˜¯ private çš„ï¼Œå¯èƒ½éœ€è¦ç¨å¾®æ”¹ä¸€ä¸‹åº“æš´éœ²å‡ºæ¥ï¼Œæˆ–è€…è‡ªå·±å†™)
             }
 
             if (packet->nLen > headerLen) {
                 uint32_t timestamp = 0;
                 RTPHeader* rtpHeader = (RTPHeader*)packet->pData;
-                uint32_t timestamp = ntohl(rtpHeader->timestamp);
-                // ¹¹Ôì vector ´«¸ø reassembleH264
-                                // Ö¸ÕëÔËËã£ºÌø¹ı Header
+                timestamp = ntohl(rtpHeader->timestamp);
+                // æ„é€  vector ä¼ ç»™ reassembleH264
+                                // æŒ‡é’ˆè¿ç®—ï¼šè·³è¿‡ Header
                 const uint8_t* payloadPtr = packet->pData + headerLen;
                 size_t payloadSize = packet->nLen - headerLen;
 
                 std::vector<uint8_t> payloadVec(payloadPtr, payloadPtr + payloadSize);
                 if (m_isH264) {
-                    // ÊÓÆµ£ºĞèÒª¸´ÔÓµÄ FU-A ×éÖ¡
+                    // è§†é¢‘ï¼šéœ€è¦å¤æ‚çš„ FU-A ç»„å¸§
                     reassembleH264(payloadVec, timestamp);
                 }
                 else {
-                    // ÒôÆµ (Opus)£º²»ĞèÒª×éÖ¡£¬Ö±½Ó´ò°üÈë¶Ó£¡
+                    // éŸ³é¢‘ (Opus)ï¼šä¸éœ€è¦ç»„å¸§ï¼Œç›´æ¥æ‰“åŒ…å…¥é˜Ÿï¼
                     AVPacketPtr packet(av_packet_alloc());
 
                     av_new_packet(packet.get(), payloadVec.size());
@@ -92,20 +92,20 @@ void RTPDepacketizer ::processPop() {
                     packet->pts = timestamp;
                     packet->dts = timestamp;
 
-                    // Ö±½ÓÍÆ¸ø Audio Packet Queue
+                    // ç›´æ¥æ¨ç»™ Audio Packet Queue
                     m_outputQueue->enqueue(move(packet));
                 }
             }
         }
         else if (res == RTPJitter::DROPPED_PACKET) {
-            // === ¶ª°ü´¦Àí ===
-            // ¿â¸æËßÎÒÃÇÒªÌø¹ıÒ»¸ö°ü£¨ÖĞ¼äÈ±»õ³¬Ê±ÁË£©
-            // ÕâÒâÎ¶×Å FU-A ×éÖ¡¿Ï¶¨Ê§°ÜÁË£¬±ØĞëÖØÖÃ×éÖ¡Æ÷×´Ì¬
+            // === ä¸¢åŒ…å¤„ç† ===
+            // åº“å‘Šè¯‰æˆ‘ä»¬è¦è·³è¿‡ä¸€ä¸ªåŒ…ï¼ˆä¸­é—´ç¼ºè´§è¶…æ—¶äº†ï¼‰
+            // è¿™æ„å‘³ç€ FU-A ç»„å¸§è‚¯å®šå¤±è´¥äº†ï¼Œå¿…é¡»é‡ç½®ç»„å¸§å™¨çŠ¶æ€
             resetH264Assembler();
-            // ¼ÌĞøÑ­»·£¬¿´ºóÃæÓĞÃ»ÓĞ°ü
+            // ç»§ç»­å¾ªç¯ï¼Œçœ‹åé¢æœ‰æ²¡æœ‰åŒ…
         }
         else {
-            // BUFFERING »ò EMPTY£¬Ìø³öÑ­»·µÈ´ıÏÂ´Î Timer
+            // BUFFERING æˆ– EMPTYï¼Œè·³å‡ºå¾ªç¯ç­‰å¾…ä¸‹æ¬¡ Timer
             break;
         }
     }
@@ -117,7 +117,7 @@ void RTPDepacketizer ::resetH264Assembler() {
     m_fuBuffer.clear();
 }
 
-// reassembleH264 ÊµÏÖ¼ûÉÏÒ»¸ö»Ø´ğ£¬±£³Ö²»±ä
+// reassembleH264 å®ç°è§ä¸Šä¸€ä¸ªå›ç­”ï¼Œä¿æŒä¸å˜
 void RTPDepacketizer ::reassembleH264(const std::vector<uint8_t>& payload, uint32_t timestamp) {
     if (payload.empty()) return;
 
@@ -129,26 +129,26 @@ void RTPDepacketizer ::reassembleH264(const std::vector<uint8_t>& payload, uint3
 
     if (type >= 1 && type <= 23) {
         // === Single NAL Unit ===
-        // ÕâÊÇÒ»¸öÍêÕûµÄ°ü (Èç SPS, PPS, SEI, »òĞ¡ÇĞÆ¬)
-        // Ö»ÓĞÕâÖÖÊ±ºò²Å¿ÉÄÜÊÇÍêÕûµÄÒ»Ö¡£¬»òÕßÊÇ²ÎÊı¼¯
+        // è¿™æ˜¯ä¸€ä¸ªå®Œæ•´çš„åŒ… (å¦‚ SPS, PPS, SEI, æˆ–å°åˆ‡ç‰‡)
+        // åªæœ‰è¿™ç§æ—¶å€™æ‰å¯èƒ½æ˜¯å®Œæ•´çš„ä¸€å¸§ï¼Œæˆ–è€…æ˜¯å‚æ•°é›†
 
         AVPacketPtr packet(av_packet_alloc());
 
         int totalSize = 4 + payload.size();
         av_new_packet(packet.get(), totalSize);
 
-        // Ğ´Èë Start Code
+        // å†™å…¥ Start Code
         memcpy(packet->data, startCode, 4);
-        // Ğ´Èë Payload
+        // å†™å…¥ Payload
         memcpy(packet->data + 4, payload.data(), payload.size());
 
-        packet->pts = timestamp; // ×¢Òâ£ºÕâÀïµÄÊ±¼ä´ÁÍ¨³£ĞèÒª×ª»»Ê±¼ä»ù
+        packet->pts = timestamp; // æ³¨æ„ï¼šè¿™é‡Œçš„æ—¶é—´æˆ³é€šå¸¸éœ€è¦è½¬æ¢æ—¶é—´åŸº
         packet->dts = timestamp;
 
-        // 5. Èë¶Ó
+        // 5. å…¥é˜Ÿ
         m_outputQueue->enqueue(move(packet));
 
-        // Èç¹ûÕıÔÚ×é×° FU-A È´À´ÁË¸ö Single NAL£¬ËµÃ÷Ö®Ç°µÄ FU-A ¶ª°üÁË£¬ÖØÖÃ×´Ì¬
+        // å¦‚æœæ­£åœ¨ç»„è£… FU-A å´æ¥äº†ä¸ª Single NALï¼Œè¯´æ˜ä¹‹å‰çš„ FU-A ä¸¢åŒ…äº†ï¼Œé‡ç½®çŠ¶æ€
         m_isReassembling = false;
         m_fuBuffer.clear();
     }
@@ -164,26 +164,26 @@ void RTPDepacketizer ::reassembleH264(const std::vector<uint8_t>& payload, uint3
         uint8_t originalType = fuHeader & 0x1F;
 
         if (startBit) {
-            // ·ÖÆ¬¿ªÊ¼
+            // åˆ†ç‰‡å¼€å§‹
             m_fuBuffer.clear();
             m_isReassembling = true;
 
-            // »¹Ô­Ô­Ê¼ NAL Header
+            // è¿˜åŸåŸå§‹ NAL Header
             uint8_t reconstructedHeader = nri | originalType;
 
-            // Ğ´Èë Start Code + Ô­Ê¼ Header
+            // å†™å…¥ Start Code + åŸå§‹ Header
             m_fuBuffer.insert(m_fuBuffer.end(), startCode, startCode + 4);
             m_fuBuffer.push_back(reconstructedHeader);
 
-            // Ğ´ÈëÊı¾İ (Ìø¹ı FU-A µÄÁ½¸öÍ·×Ö½Ú)
+            // å†™å…¥æ•°æ® (è·³è¿‡ FU-A çš„ä¸¤ä¸ªå¤´å­—èŠ‚)
             m_fuBuffer.insert(m_fuBuffer.end(), payload.begin() + 2, payload.end());
         }
         else if (m_isReassembling) {
-            // ·ÖÆ¬ÖĞ¼ä »ò ½áÊø
+            // åˆ†ç‰‡ä¸­é—´ æˆ– ç»“æŸ
             m_fuBuffer.insert(m_fuBuffer.end(), payload.begin() + 2, payload.end());
 
             if (endBit) {
-                // ·ÖÆ¬½áÊø£¬´ò°ü·¢ËÍ
+                // åˆ†ç‰‡ç»“æŸï¼Œæ‰“åŒ…å‘é€
                 AVPacketPtr packet(av_packet_alloc());
 
                 av_new_packet(packet.get(), m_fuBuffer.size());
@@ -194,12 +194,12 @@ void RTPDepacketizer ::reassembleH264(const std::vector<uint8_t>& payload, uint3
 
                 m_outputQueue->enqueue(move(packet));
 
-                // ÖØÖÃ
+                // é‡ç½®
                 m_fuBuffer.clear();
                 m_isReassembling = false;
             }
         }
     }
-    // ÆäËûÀàĞÍÈç STAP-A (Type 24) Èç¹ûĞèÒªÖ§³Ö¶à NAL ¾ÛºÏ£¬Ò²ĞèÒª´¦Àí
+    // å…¶ä»–ç±»å‹å¦‚ STAP-A (Type 24) å¦‚æœéœ€è¦æ”¯æŒå¤š NAL èšåˆï¼Œä¹Ÿéœ€è¦å¤„ç†
 }
 

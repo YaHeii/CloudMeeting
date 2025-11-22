@@ -32,7 +32,8 @@
 #include <iostream>
 #include <cmath>
 #include <cstdint>
-#include <arpa/inet.h>
+#include "winsock2.h"
+#include <winsock.h>
 
 using namespace std;
 
@@ -82,7 +83,7 @@ void RTPJitter::init(const unsigned depth, const uint32 sample_rate /* = 8000 */
     _payload_sample_rate = sample_rate;
 
     _buffering = true;
-    _buffering_timestamp = timepoint::min();
+    _buffering_timestamp = (timepoint::min)();
     _reset_buffer_stats(sample_rate);
 }
 
@@ -120,7 +121,7 @@ RTPJitter::RESULT RTPJitter::push(rawrtp_ptr p)
         }
 
         // if this is our first packet since init, start the buffering clock ...
-        if (_buffering && (_buffering_timestamp == timepoint::min())) {
+        if (_buffering && (_buffering_timestamp == (timepoint::min)())) {
             _buffering_timestamp = stdclock::now();
         }
 
@@ -238,7 +239,7 @@ RTPJitter::RESULT RTPJitter::pop(rawrtp_ptr& packet)
              || (_depth_ms >= _nominal_depth_ms))
             {
                 _buffering = false;
-                _buffering_timestamp = timepoint::min();
+                _buffering_timestamp = (timepoint::min)();
             }
         }
     }
@@ -522,6 +523,6 @@ void RTPJitter::_reset_buffer_stats(uint32 sample_rate)
     _stats.max_jitter = 0.0;
     _stats.prev_arrival = 0;
     _stats.prev_transit = 0;
-    _stats.prev_rx_timestamp = timepoint::min();
+    _stats.prev_rx_timestamp = (timepoint::min)();
     _stats.conversion_factor_timestamp_units = sample_rate / 1000;
 }

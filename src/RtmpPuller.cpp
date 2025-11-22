@@ -129,6 +129,7 @@ void RtmpPuller::onStreamOpened_initAudio(AVCodecParameters* aParams, AVRational
 			Q_ARG(AVRational, aTimeBase)))
 		{
 			// 成功后，启动音频解码播放循环
+			// TODO:修改接口
 			QMetaObject::invokeMethod(m_audioPlayer, "startPlaying", Qt::QueuedConnection);
 		}
 		else {

@@ -5,8 +5,8 @@
  *保证在远端视频解码的代码可复用性
  */
 
-#ifndef FFMPEGDECODER_H
-#define FFMPEGDECODER_H
+#ifndef FFMPEGVIDEODECODER_H
+#define FFMPEGVIDEODECODER_H
 
 #include <QObject>
 #include <QImage>

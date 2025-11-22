@@ -1,11 +1,5 @@
-#include "WebRTCPuller.h"
-#include "logqueue.h"
-#include "log_global.h"
-#include "RtmpAudioPlayer.h"
-#include <QApplication>
-#include <QScreen>
-#include <QDebug>
-#include "RTPDepacketizer.h"
+Ôªø#include "WebRTCPuller.h"
+
 
 WebRTCPuller::WebRTCPuller(QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue,
 	QObject *parent)
@@ -15,9 +9,13 @@ WebRTCPuller::WebRTCPuller(QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue
 	m_videoPacketQueue = new QUEUE_DATA<AVPacketPtr>();
     m_audioPacketQueue = new QUEUE_DATA<AVPacketPtr>();
 	m_dummyVideoFrameQueue = new QUEUE_DATA<AVFramePtr>();
+    m_networkManager = nullptr;
+    m_networkManager = new QNetworkAccessManager(this);
+    rtcPreload();
+
 
 	m_videoDecoder = new ffmpegVideoDecoder(m_videoPacketQueue,
-											m_MainQimageQueue, //  π”√Õ‚≤ø QImage ∂”¡–
+											m_MainQimageQueue, // ‰ΩøÁî®Â§ñÈÉ® QImage ÈòüÂàó
 											m_dummyVideoFrameQueue);
 	m_audioPlayer = new RtmpAudioPlayer(m_audioPacketQueue);
 
@@ -48,7 +46,7 @@ bool WebRTCPuller::init(QString WebRTCUrl) {
 
 	WRITE_LOG("Initializing WebRTC Puller");
 
-	//// ≥ı ºªØdc»’÷æœµÕ≥£¨ π”√ƒ⁄÷√»’÷æœµÕ≥ ‰≥ˆ
+	//// ÂàùÂßãÂåñdcÊó•ÂøóÁ≥ªÁªüÔºå‰ΩøÁî®ÂÜÖÁΩÆÊó•ÂøóÁ≥ªÁªüËæìÂá∫
 	//rtc::InitLogger(rtc::LogLevel::Verbose, [](rtc::LogLevel level, rtc::string message) {
 	//    const char* file = "libdatachannel";
 	//    const char* function = "rtc_callback";
@@ -67,7 +65,8 @@ bool WebRTCPuller::init(QString WebRTCUrl) {
 	m_rtcConfig.mtu = 1500;
 	m_rtcConfig.portRangeBegin = 10000;
 	m_rtcConfig.portRangeEnd = 20000;
-	initializePeerConnection();
+    emit initSuccess();
+
 
 	return true;
 }
@@ -77,7 +76,7 @@ void WebRTCPuller::initializePeerConnection()
     try {
         m_peerConnection = std::make_unique<rtc::PeerConnection>(m_rtcConfig);
 
-        //// ¥¥Ω®SDP
+        //// ÂàõÂª∫SDP
         // video part
         rtc::Description::Video video("video");
         //rtc::Description::Video video("video", rtc::Description::Direction::SendOnly);
@@ -103,23 +102,26 @@ void WebRTCPuller::initializePeerConnection()
             std::string trackType = track->description();
             bool isVideo = (trackType.find("video") != std::string::npos);
 
-            // ∞Û∂® RTP  ˝æ›ªÿµ˜
+            // ÁªëÂÆö RTP Êï∞ÊçÆÂõûË∞É
             track->onMessage([this, isVideo](rtc::message_variant message) {
+                if (!m_isPulling) {
+                    return;
+                }
                 if (!std::holds_alternative<rtc::binary>(message)) return;
 
                 auto& data_bin = std::get<rtc::binary>(message);
-                // data_bin  « std::vector<byte> ªÚ¿‡À∆Ω·ππ
+                // data_bin ÊòØ std::vector<byte> ÊàñÁ±ª‰ººÁªìÊûÑ
 
-                // Ω´ std::byte ◊™ªªŒ™ uint8_t ÷∏’Î
+                // Â∞Ü std::byte ËΩ¨Êç¢‰∏∫ uint8_t ÊåáÈíà
                 const uint8_t* data_ptr = reinterpret_cast<const uint8_t*>(data_bin.data());
                 size_t data_size = data_bin.size();
 
-                // ≈–∂œ « ”∆µªπ «“Ù∆µ
-                // ◊¢“‚£∫ µº ≈–∂œÕ®≥£ª˘”⁄ Description ªÚ SDP –≠…ÃΩ·π˚£¨’‚¿ÔºÚµ•Õ®π˝ mid ªÚ description ≈–∂œ
+                // Âà§Êñ≠ÊòØËßÜÈ¢ëËøòÊòØÈü≥È¢ë
+                // Ê≥®ÊÑèÔºöÂÆûÈôÖÂà§Êñ≠ÈÄöÂ∏∏Âü∫‰∫é Description Êàñ SDP ÂçèÂïÜÁªìÊûúÔºåËøôÈáåÁÆÄÂçïÈÄöËøá mid Êàñ description Âà§Êñ≠
                 if (isVideo) {
-                    // ===  ”∆µ¥¶¿Ì ===
-                    // ÷±Ω”Õ∆»ÎΩ‚∞¸∆˜°£
-                    // Ω‚∞¸∆˜ƒ⁄≤ø∏∫‘£∫JitterBuffer≈≈–Ú -> ∂® ±»°∞¸ -> FU-A÷ÿ◊È -> º”…œ00000001 -> »Î∂” m_videoPacketQueue
+                    // === ËßÜÈ¢ëÂ§ÑÁêÜ ===
+                    // Áõ¥Êé•Êé®ÂÖ•Ëß£ÂåÖÂô®„ÄÇ
+                    // Ëß£ÂåÖÂô®ÂÜÖÈÉ®Ë¥üË¥£ÔºöJitterBufferÊéíÂ∫è -> ÂÆöÊó∂ÂèñÂåÖ -> FU-AÈáçÁªÑ -> Âä†‰∏ä00000001 -> ÂÖ•Èòü m_videoPacketQueue
                     if (m_videoDepacketizer) {
                         m_videoDepacketizer->pushPacket(data_ptr, data_size);
                     } else {
@@ -135,7 +137,7 @@ void WebRTCPuller::initializePeerConnection()
                 }
              });
          });
-        //// descriptionªÿµ˜
+        //// descriptionÂõûË∞É
         m_peerConnection->onLocalDescription([this](const rtc::Description& description) {
             QMetaObject::invokeMethod(this, [this, description]() {
                 //QString sdp_offer = QString::fromStdString(description);
@@ -143,7 +145,7 @@ void WebRTCPuller::initializePeerConnection()
                 sendOfferToSignalingServer(sdp_offer);
                 });
          });
-        //// PC Stateªÿµ˜
+        //// PC StateÂõûË∞É
         m_peerConnection->onStateChange([this](rtc::PeerConnection::State state) {
             auto stateToString = [](rtc::PeerConnection::State s) {
                 switch (s) {
@@ -159,6 +161,7 @@ void WebRTCPuller::initializePeerConnection()
             WRITE_LOG("WebRTC PeerConnection state changed: %s", stateToString(state));
             if (state == rtc::PeerConnection::State::Connected) {
                 initCodecParams();
+                
             }
             else if (state == rtc::PeerConnection::State::Failed) {
                 emit errorOccurred("WebRTC connection failed.");
@@ -166,7 +169,7 @@ void WebRTCPuller::initializePeerConnection()
             }
          });
 
-        /// ICE Stateªÿµ˜
+        /// ICE StateÂõûË∞É
         m_peerConnection->onGatheringStateChange([this](rtc::PeerConnection::GatheringState state) {
             auto stateToString = [](rtc::PeerConnection::GatheringState s) {
                 switch (s) {
@@ -179,7 +182,7 @@ void WebRTCPuller::initializePeerConnection()
             WRITE_LOG("WebRTC ICE Gathering state changed: %s", stateToString(state));
 
           });
-        /// Signaling Stateªÿµ˜
+        /// Signaling StateÂõûË∞É
         m_peerConnection->onSignalingStateChange([](rtc::PeerConnection::SignalingState state) {
             auto stateToString = [](rtc::PeerConnection::SignalingState s) {
                 switch (s) {
@@ -192,7 +195,7 @@ void WebRTCPuller::initializePeerConnection()
              };
             WRITE_LOG("Signaling state changed: %s", stateToString(state));
         });
-        //ÕÍ≥…ªÿµ˜∫ÛÃÌº”offer£¨∑¿÷πæ∫Ã¨
+        //ÂÆåÊàêÂõûË∞ÉÂêéÊ∑ªÂä†offerÔºåÈò≤Ê≠¢Á´ûÊÄÅ
         m_peerConnection->setLocalDescription();
         WRITE_LOG("Local description set, waiting for ICE gathering...");
     }
@@ -279,19 +282,19 @@ void WebRTCPuller::onSignalingReply(QNetworkReply* response) {
     }
     QByteArray response_data = response->readAll();
     QString sdpAnswer = NULL;
-    //HTTP◊¥Ã¨¬ÎºÏ≤È
+    //HTTPÁä∂ÊÄÅÁ†ÅÊ£ÄÊü•
     int httpStatus = response->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    if (httpStatus == 201) {  // WHIP ≥…π¶◊¥Ã¨¬Î
+    if (httpStatus == 201) {  // WHIP ÊàêÂäüÁä∂ÊÄÅÁ†Å
         sdpAnswer = QString::fromUtf8(response_data);
-        WRITE_LOG("WHIP publish successful,SDP_Answer:", sdpAnswer);
+        WRITE_LOG("WHEP publish successful,SDP_Answer:", sdpAnswer);
     }
     else {
-        WRITE_LOG("WHIP failed with status:", httpStatus);
-        emit errorOccurred(QString("WHIP failed: HTTP %1").arg(httpStatus));
+        WRITE_LOG("WHEP failed with status:", httpStatus);
+        emit errorOccurred(QString("WHEP failed: HTTP %1").arg(httpStatus));
     }
 
 
-    // …Ë÷√‘∂∂ÀSDP√Ë ˆ
+    // ËÆæÁΩÆËøúÁ´ØSDPÊèèËø∞
     try {
         if (m_peerConnection) {
             m_peerConnection->setRemoteDescription(rtc::Description(sdpAnswer.toStdString(), "answer"));
@@ -308,7 +311,7 @@ void WebRTCPuller::onSignalingReply(QNetworkReply* response) {
         emit errorOccurred(error);
     }
 
-    QTimer::singleShot(30000, [response]() { // 30√Î∫Û…æ≥˝
+    QTimer::singleShot(30000, [response]() { // 30ÁßíÂêéÂà†Èô§
         if (response) {
             response->deleteLater();
         }
@@ -317,29 +320,29 @@ void WebRTCPuller::onSignalingReply(QNetworkReply* response) {
 }
 
 void WebRTCPuller::initCodecParams() {
-    // 1. ππ‘Ï Video Parameters (H.264)
-    AVCodecParameters* vParams = avcodec_parameters_alloc();
-    vParams->codec_type = AVMEDIA_TYPE_VIDEO;
-    vParams->codec_id = AV_CODEC_ID_H264;
-    // øÌ∏ﬂœ»∏¯0ªÚ’ﬂ‘§…Ë÷µ£¨FFmpeg ’µΩµ⁄“ª∏ˆSPS∞¸∫Ûª·◊‘∂Ø∏¸–¬Context
-    vParams->width = 1920;
-    vParams->height = 1080;
+    // 1. ÊûÑÈÄ† Video Parameters (H.264)
+    m_vParams = avcodec_parameters_alloc();
+    m_vParams->codec_type = AVMEDIA_TYPE_VIDEO;
+    m_vParams->codec_id = AV_CODEC_ID_H264;
+    // ÂÆΩÈ´òÂÖàÁªô0ÊàñËÄÖÈ¢ÑËÆæÂÄºÔºåFFmpegÊî∂Âà∞Á¨¨‰∏Ä‰∏™SPSÂåÖÂêé‰ºöËá™Âä®Êõ¥Êñ∞Context
+    m_vParams->width = 1920;
+    m_vParams->height = 1080;
 
-    // RTP H.264 ±Í◊º ±ª˘
-    AVRational vTimeBase = { 1, 90000 };
+    // RTP H.264 Ê†áÂáÜÊó∂Âü∫
+    m_vTimeBase = { 1, 90000 };
 
-    // 2. ππ‘Ï Audio Parameters (Opus)
-    AVCodecParameters* aParams = avcodec_parameters_alloc();
-    aParams->codec_type = AVMEDIA_TYPE_AUDIO;
-    aParams->codec_id = AV_CODEC_ID_OPUS;
-    aParams->sample_rate = 48000;
-    aParams->ch_layout.nb_channels = 2; 
+    // 2. ÊûÑÈÄ† Audio Parameters (Opus)
+    m_aParams = avcodec_parameters_alloc();
+    m_aParams->codec_type = AVMEDIA_TYPE_AUDIO;
+    m_aParams->codec_id = AV_CODEC_ID_OPUS;
+    m_aParams->sample_rate = 48000;
+    m_aParams->ch_layout.nb_channels = 2; 
 
-    // RTP Opus ±Í◊º ±ª˘
-    AVRational aTimeBase = { 1, 48000 };
+    // RTP Opus Ê†áÂáÜÊó∂Âü∫
+    m_aTimeBase = { 1, 48000 };
 
-    emit VideostreamOpened(vParams, vTimeBase);
-    emit AudiostreamOpened(aParams, aTimeBase);
+    emit VideostreamOpened(m_vParams, m_vTimeBase);
+    emit AudiostreamOpened(m_aParams, m_aTimeBase);
 
 }
 
@@ -348,17 +351,17 @@ void WebRTCPuller::onStreamOpened_initVideo(AVCodecParameters* vParams, AVRation
 
 
 	if (vParams) {
-		WRITE_LOG("RtmpPuller: Initializing video decoder...");
-		// øÁœﬂ≥Ãµ˜”√ ffmpegVideoDecoder::init
+		WRITE_LOG("WebRTCPuller: Initializing video decoder...");
+		// Ë∑®Á∫øÁ®ãË∞ÉÁî® ffmpegVideoDecoder::init
 		if (QMetaObject::invokeMethod(m_videoDecoder, "init",
 			Q_ARG(AVCodecParameters*, vParams),
 			Q_ARG(AVRational, vTimeBase)))
 		{
-			// ≥…π¶∫Û£¨∆Ù∂Ø ”∆µΩ‚¬Î—≠ª∑
+			// ÊàêÂäüÂêéÔºåÂêØÂä®ËßÜÈ¢ëËß£Á†ÅÂæ™ÁéØ
 			QMetaObject::invokeMethod(m_videoDecoder, "ChangeDecodingState", Qt::QueuedConnection, Q_ARG(bool, true));
 		}
 		else {
-			emit errorOccurred("RtmpPuller: Failed to invoke video init.");
+			emit errorOccurred("WebRTCPuller: Failed to invoke video init.");
 		}
 	}
 }
@@ -366,17 +369,18 @@ void WebRTCPuller::onStreamOpened_initVideo(AVCodecParameters* vParams, AVRation
 void WebRTCPuller::onStreamOpened_initAudio(AVCodecParameters* aParams, AVRational aTimeBase) {
 
 	if (aParams) {
-		WRITE_LOG("RtmpPuller: Initializing audio player...");
-		// øÁœﬂ≥Ãµ˜”√ RtmpAudioPlayer::init
+		WRITE_LOG("WebRTCPuller: Initializing audio player...");
+		// Ë∑®Á∫øÁ®ãË∞ÉÁî® RtmpAudioPlayer::init
 		if (QMetaObject::invokeMethod(m_audioPlayer, "init",
 			Q_ARG(AVCodecParameters*, aParams),
 			Q_ARG(AVRational, aTimeBase)))
 		{
-			// ≥…π¶∫Û£¨∆Ù∂Ø“Ù∆µΩ‚¬Î≤•∑≈—≠ª∑
+			// ÊàêÂäüÂêéÔºåÂêØÂä®Èü≥È¢ëËß£Á†ÅÊí≠ÊîæÂæ™ÁéØ
+            // TODO:‰øÆÊîπÊé•Âè£
 			QMetaObject::invokeMethod(m_audioPlayer, "startPlaying", Qt::QueuedConnection);
 		}
 		else {
-			emit errorOccurred("RtmpPuller: Failed to invoke audio init.");
+			emit errorOccurred("WebRTCPuller: Failed to invoke audio init.");
 		}
 	}
 }
@@ -402,8 +406,6 @@ void WebRTCPuller::startPulling() {
 	WRITE_LOG("WebRTCPuller: Starting all threads...");
 	m_videoDecodeThread->start();
 	m_audioPlayThread->start();
-
-	QMetaObject::invokeMethod(this, "doPullingWork", Qt::QueuedConnection);
 }
 
 void WebRTCPuller::stopPulling() {
@@ -416,60 +418,7 @@ void WebRTCPuller::stopPulling() {
 }
 
 
-void WebRTCPuller::doPullingWork() {
-    //WRITE_LOG("doPullingWork clicked");
 
-    if (!m_isPulling) {
-        WRITE_LOG("RtmpPuller: Stopping all threads...");
-        return;
-    }
-
-    AVPacketPtr packet(av_packet_alloc());
-    if (!packet) {
-        WRITE_LOG("RtmpPuller: Failed to allocate AVPacket.");
-        if (m_isPulling) {
-            QMetaObject::invokeMethod(this, "doPullingWork", Qt::QueuedConnection);
-        }
-        return;
-    }
-    {
-        QMutexLocker locker(&m_workMutex);
-        m_isDoingWork = true;
-    }
-    auto work_guard = [this]() {
-        QMutexLocker locker(&m_workMutex);
-        m_isDoingWork = false;
-        m_workCond.wakeAll();
-        };
-    int ret = 0;
-    if (ret = av_read_frame(m_fmtCtx, packet.get()) < 0) {
-        if (ret == AVERROR_EOF) {
-            WRITE_LOG("RtmpPuller: End of stream.");
-        }
-        else if (m_isPulling == false) {
-            WRITE_LOG("RtmpPuller: Pulling interrupted by user.");
-        }
-        else {
-            WRITE_LOG("RtmpPuller: av_read_frame error:");
-            emit errorOccurred("RtmpPuller: av_read_frame error: %1");
-        }
-
-    }
-
-    // Ω´∞¸∑≈»Î’˝»∑µƒƒ⁄≤ø∂”¡–
-    if (packet->stream_index == m_videoStreamIndex) {
-        m_videoPacketQueue->enqueue(std::move(packet));
-    }
-    else if (packet->stream_index == m_audioStreamIndex) {
-        m_audioPacketQueue->enqueue(std::move(packet));
-    }
-    else {
-        WRITE_LOG("RtmpPuller: Unknown stream index.");
-    }
-
-    work_guard();
-    if (m_isPulling) {
-        QMetaObject::invokeMethod(this, "doPullingWork", Qt::QueuedConnection);
-    }
-
+void WebRTCPuller::clear() { 
+    WRITE_LOG("TO CLEAR THREAD");
 }

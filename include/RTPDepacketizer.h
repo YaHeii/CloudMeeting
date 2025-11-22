@@ -1,8 +1,8 @@
-#ifndef RTPDEPACKETIZER_H
+ï»¿#ifndef RTPDEPACKETIZER_H
 #define RTPDEPACKETIZER_H
 
 
-#include "rtp_jitter.h" // ÒıÈë¿âÍ·ÎÄ¼ş
+#include "rtp_jitter.h" // å¼•å…¥åº“å¤´æ–‡ä»¶
 #include <QObject>
 #include <QTimer>
 #include "ThreadSafeQueue.h"
@@ -18,17 +18,16 @@ extern "C" {
 class RTPDepacketizer : public QObject {
     Q_OBJECT
 public:
-    // sample_rate: ÊÓÆµ 90000, ÒôÆµ 48000
+    // sample_rate: è§†é¢‘ 90000, éŸ³é¢‘ 48000
     RTPDepacketizer(int sampleRate, QUEUE_DATA<AVPacketPtr>* outputQueue, bool isH264, QObject* parent = nullptr);
 
     ~RTPDepacketizer();
-    // ¡¾Éú²úÕß¡¿ÍøÂçÏß³Ìµ÷ÓÃ£ºÍÆÈëÊı¾İ
+    // ã€ç”Ÿäº§è€…ã€‘ç½‘ç»œçº¿ç¨‹è°ƒç”¨ï¼šæ¨å…¥æ•°æ®
     void pushPacket(const uint8_t* data, size_t len);
 
 public slots:
-    // ¡¾Ïû·ÑÕß¡¿¶¨Ê±Æ÷µ÷ÓÃ£ºÈ¡³öÊı¾İ²¢×éÖ¡
+    // ã€æ¶ˆè´¹è€…ã€‘å®šæ—¶å™¨è°ƒç”¨ï¼šå–å‡ºæ•°æ®å¹¶ç»„å¸§
     void processPop();
-    void processOpusPop();
 
 private:
     bool m_isH264;
@@ -36,7 +35,7 @@ private:
     QTimer* m_consumerTimer;
     QUEUE_DATA<AVPacketPtr>* m_outputQueue;
 
-    // H.264 ×éÖ¡×´Ì¬
+    // H.264 ç»„å¸§çŠ¶æ€
     std::vector<uint8_t> m_fuBuffer;
     bool m_isReassembling = false;
 
