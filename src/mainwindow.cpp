@@ -96,8 +96,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_webRTCPublisher = new WebRTCPublisher(m_publishPacketQueue);
     m_webRTCPublisher->moveToThread(m_webRTCPublisherThread);
     m_webRTCPublisherThread->start();
-    QMetaObject::invokeMethod(m_webRTCPublisher, "initThread", Qt::QueuedConnection);// 为了初始化libdatachannel
-    //connect(m_webRTCPublisher, &WebRTCPublisher::PLIReceived, this, &MainWindow::on_PLIReceived_webrtcPublisher, Qt::QueuedConnection);//处理RTC->RTMP转码时的PLI请求
+    //QMetaObject::invokeMethod(m_webRTCPublisher, "initThread", Qt::QueuedConnection);// 为了初始化libdatachannel
+    connect(m_webRTCPublisher, &WebRTCPublisher::PLIReceived, this, &MainWindow::on_PLIReceived_webrtcPublisher, Qt::QueuedConnection);//处理RTC->RTMP转码时的PLI请求
 
     // RTMP拉流
     m_rtmpPullerThread = new QThread(this);
@@ -111,7 +111,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_webRTCPuller = new WebRTCPuller(m_MainQimageQueue);
     m_webRTCPuller->moveToThread(m_webrtcPullerThread);
     m_webrtcPullerThread->start();
-    QMetaObject::invokeMethod(m_webRTCPublisher, "initThread", Qt::QueuedConnection);// 为了初始化libdatachannel
+    //QMetaObject::invokeMethod(m_webRTCPublisher, "initThread", Qt::QueuedConnection);// 为了初始化libdatachannel
     connect(m_webRTCPuller, &WebRTCPuller::newFrameAvailable, this, &MainWindow::onNewRemoteFrameAvailable, Qt::QueuedConnection);
 
     //获取可用设备
@@ -395,9 +395,11 @@ void MainWindow::on_joinmeetBtn_clicked() {
 
     WRITE_LOG("WebRTC Joining meeting");
     QString WebRTCUrl = "http://172.24.73.45:1985/rtc/v1/whep/?app=live&stream=livestream";
+    QString audioDevice = ui->audioDevicecomboBox->currentText();
     if (!WebRTCUrl.isEmpty()) {
         QMetaObject::invokeMethod(m_webRTCPuller, "init", Qt::QueuedConnection,
-                                  Q_ARG(QString, WebRTCUrl));
+                                  Q_ARG(QString, WebRTCUrl),
+                                   Q_ARG(QString,audioDevice));
         connect(m_webRTCPuller, &WebRTCPuller::initSuccess, this, &MainWindow::onWebRTCPullerInitSuccess);
     }
 }
@@ -407,7 +409,7 @@ void MainWindow::onRtmpPullerInitSuccess() {
 }
 void MainWindow::onWebRTCPullerInitSuccess() {
     WRITE_LOG("WebRTC puller initialized.");
-    QMetaObject::invokeMethod(m_webRTCPuller, "initializePeerConnection", Qt::QueuedConnection);
+    QMetaObject::invokeMethod(m_webRTCPuller, "ChangePullingState", Qt::QueuedConnection,Q_ARG(bool,true));
 }
 //// 退出会议按钮
 void MainWindow::on_exitmeetBtn_clicked() {
@@ -481,7 +483,7 @@ void MainWindow::handleDeviceOpened() {
     qDebug() << "Main thread: Received device opened signal.";
 }
 void MainWindow::on_PLIReceived_webrtcPublisher() {
-    WRITE_LOG("WebRTC requested Keyframe (PLI). Forwarding to Encoder...");
+    //WRITE_LOG("WebRTC requested Keyframe (PLI). Forwarding to Encoder...");
 
     // 告诉视频编码器：立即生成一个 IDR 帧
     if (m_videoEncoder) {

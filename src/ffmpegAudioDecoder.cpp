@@ -17,7 +17,6 @@ ffmpegAudioDecoder::ffmpegAudioDecoder(QUEUE_DATA<AVPacketPtr> *packetQueue, QUE
 }
 
 ffmpegAudioDecoder::~ffmpegAudioDecoder() {
-    stopDecoding();
     clear();
 }
 
@@ -114,11 +113,12 @@ void ffmpegAudioDecoder::doDecodingPacket() {
         m_workCond.wakeAll();
     };
 
-    AVFramePtr decoded_frame(av_frame_alloc());
+    AVFramePtr decodedFrame(av_frame_alloc());
     AVFramePtr resampledFrame(av_frame_alloc());
-    if (!decoded_frame || !resampledFrame) {
+    if (!decodedFrame || !resampledFrame) {
         emit errorOccurred("ffmpegAudioDecoder::Failed to allocate frame");
         m_isDecoding = false;
+        work_guard();
         return;
     }
     if (packet->size <= 0) {
@@ -131,7 +131,7 @@ void ffmpegAudioDecoder::doDecodingPacket() {
         WRITE_LOG("Error: avcodec_send_packet failed: %s", errbuf);
     }
     while (true) {
-        ret = avcodec_receive_frame(m_codecCtx, decoded_frame.get());
+        ret = avcodec_receive_frame(m_codecCtx, decodedFrame.get());
         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
             break;
         }
@@ -141,19 +141,19 @@ void ffmpegAudioDecoder::doDecodingPacket() {
         }
 
         ////检测音频通道布局,后期删除
-        if (decoded_frame->ch_layout.nb_channels > 0 &&
-            (decoded_frame->ch_layout.order == AV_CHANNEL_ORDER_UNSPEC || decoded_frame->ch_layout.u.mask == 0)) {
+        if (decodedFrame->ch_layout.nb_channels > 0 &&
+            (decodedFrame->ch_layout.order == AV_CHANNEL_ORDER_UNSPEC || decodedFrame->ch_layout.u.mask == 0)) {
 
-            av_channel_layout_default(&decoded_frame->ch_layout, decoded_frame->ch_layout.nb_channels);
+            av_channel_layout_default(&decodedFrame->ch_layout, decodedFrame->ch_layout.nb_channels);
             // WRITE_LOG("Fixed audio channel layout for DirectShow input.");
         }
 
 
         // 设置BasePts
         //如果FIFO是空的，那么这个解码帧是音频流的起始帧，那么设置PTS为后续基准PTS
-        if (m_fifoBasePts == AV_NOPTS_VALUE && decoded_frame->pts != AV_NOPTS_VALUE) {
+        if (m_fifoBasePts == AV_NOPTS_VALUE && decodedFrame->pts != AV_NOPTS_VALUE) {
             if (av_audio_fifo_size(m_fifo) == 0) {
-                m_fifoBasePts = decoded_frame->pts;
+                m_fifoBasePts = decodedFrame->pts;
                 WRITE_LOG("Audio Decoder Base PTS set to: %lld", m_fifoBasePts);
             }
         }
@@ -162,24 +162,24 @@ void ffmpegAudioDecoder::doDecodingPacket() {
                 &m_ResampleConfig.ch_layout,
                 m_ResampleConfig.sample_fmt,
                 m_ResampleConfig.sample_rate,
-                &decoded_frame->ch_layout, // [关键] 使用 decoded_frame 的真实布局
-                (enum AVSampleFormat)decoded_frame->format, // [关键] 使用 decoded_frame 的真实格式
-                decoded_frame->sample_rate, // [关键] 使用 decoded_frame 的真实采样率
+                &decodedFrame->ch_layout, // [关键] 使用 decoded_frame 的真实布局
+                (enum AVSampleFormat)decodedFrame->format, // [关键] 使用 decoded_frame 的真实格式
+                decodedFrame->sample_rate, // [关键] 使用 decoded_frame 的真实采样率
                 0, nullptr);
 
             if (swr_init(m_swrCtx) < 0) {
                 WRITE_LOG("FATAL: Failed to init SwrContext with frame params.");
-                av_frame_unref(decoded_frame.get());
+                av_frame_unref(decodedFrame.get());
                 continue;
             }
-            WRITE_LOG("SwrContext initialized with Frame: %d Hz, Fmt: %d", decoded_frame->sample_rate, decoded_frame->format);
+            WRITE_LOG("SwrContext initialized with Frame: %d Hz, Fmt: %d", decodedFrame->sample_rate, decodedFrame->format);
         }
 
         resampledFrame->ch_layout = m_ResampleConfig.ch_layout;
         resampledFrame->sample_rate = m_ResampleConfig.sample_rate;
         resampledFrame->format = m_ResampleConfig.sample_fmt;
 
-        ret = swr_convert_frame(m_swrCtx, resampledFrame.get(), decoded_frame.get());
+        ret = swr_convert_frame(m_swrCtx, resampledFrame.get(), decodedFrame.get());
 
         if (ret < 0) {
             // [!! 自动恢复 !!] 如果转换失败，很可能是格式变了。
@@ -188,7 +188,7 @@ void ffmpegAudioDecoder::doDecodingPacket() {
             swr_free(&m_swrCtx);
             m_swrCtx = nullptr;
 
-            av_frame_unref(decoded_frame.get());
+            av_frame_unref(decodedFrame.get());
             continue; // 跳过这一帧，下一次会重新初始化
         }
 
@@ -230,7 +230,7 @@ void ffmpegAudioDecoder::doDecodingPacket() {
             //WRITE_LOG("Audio Decoder: Enqueuing frame (Size: %d)", sendFrame->nb_samples);
             m_frameQueue->enqueue(std::move(sendFrame));
         }
-        av_frame_unref(decoded_frame.get());
+        av_frame_unref(decodedFrame.get());
         av_frame_unref(resampledFrame.get());
     }
     work_guard();

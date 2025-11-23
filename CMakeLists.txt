@@ -37,7 +37,7 @@ add_executable(CloudMeeting
         src/screen.cpp
         src/VideoWidget.cpp
         src/WebRTCPublisher.cpp
-        src/RtmpAudioPlayer.cpp
+        "src/AudioPlayer.cpp"
         src/RtmpPuller.cpp
         src/RTPDepacketizer.cpp
         src/rtp_jitter.cpp
@@ -60,7 +60,7 @@ add_executable(CloudMeeting
         include/ThreadSafeQueue.h 
         include/VideoWidget.h
         include/netheader.h
-        include/RtmpAudioPlayer.h
+        "include/AudioPlayer.h"
         include/RtmpPuller.h
         include/WebRTCPuller.h
         include/RTPDepacketizer.h

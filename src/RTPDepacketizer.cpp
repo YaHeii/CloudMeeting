@@ -1,5 +1,7 @@
 ﻿#include "RTPDepacketizer.h"
 #include <winsock2.h>
+#include "log_global.h"
+#include "logqueue.h"
 extern "C" {
 #include <libavcodec/avcodec.h>
 }
@@ -9,11 +11,15 @@ RTPDepacketizer::RTPDepacketizer(int sampleRate, QUEUE_DATA<AVPacketPtr>* output
 {
     // 设定缓冲深度，例如 200ms。这决定了抗抖动能力和延迟。
     m_jitterBuffer = new RTPJitter(200, sampleRate);
-
+    if (m_jitterBuffer) {
+        WRITE_LOG("jitterBuffer init");
+    }
     // 启动一个定时器来驱动数据 "流出"
     // Jitter Buffer 的核心是 "延时输出"，所以需要定时去取
     m_consumerTimer = new QTimer(this);
-
+    if (m_consumerTimer) {
+        WRITE_LOG("Timer init");
+    }
     connect(m_consumerTimer, &QTimer::timeout, this, &RTPDepacketizer::processPop);
 
 
@@ -26,10 +32,14 @@ RTPDepacketizer::~RTPDepacketizer() {
 
 // 【生产者】网络线程调用：推入数据
 void RTPDepacketizer::pushPacket(const uint8_t* data, size_t len) {
+
     // 1. 封装成库需要的对象
     // 注意：RTPPacket 构造函数会发生一次内存拷贝，这是必要的
     rawrtp_ptr packet = std::make_shared<RTPPacket>((uint8_t*)data, len);
-
+    if (packet == NULL) {
+        WRITE_LOG("Packetizer failed");
+        return;
+    }
     // 2. 关键修正：设置 Payload 时间
     // 该库依赖 payload_ms 计算缓冲区深度。
     // H.264 一帧可能分很多包，单个包时间很难界定。
@@ -37,9 +47,12 @@ void RTPDepacketizer::pushPacket(const uint8_t* data, size_t len) {
     // 或者简单粗暴认为每个包代表 0ms (因为只是分片)，只有完整帧才有时间。
     // 库源码中 _depth_ms 会累加这个值。为了避免 overflow 逻辑误判，建议设为 0。
     packet->payload_ms = 0;
-
     // 3. 推入 Jitter Buffer
-    m_jitterBuffer->push(packet);
+    RTPJitter::RESULT  res = m_jitterBuffer->push(packet);
+    if (res == RTPJitter::SUCCESS) {
+        WRITE_LOG("push packet in the jitterbuffer");
+    }
+
 }
 
 
@@ -51,6 +64,7 @@ void RTPDepacketizer ::processPop() {
         RTPJitter::RESULT res = m_jitterBuffer->pop(packet);
 
         if (res == RTPJitter::SUCCESS) {
+            WRITE_LOG("pop a packet from jitterBuffer");
             // === 成功取出一个有序包 ===
             // packet->pData 是完整的 RTP 包（含 Header）
             // packet->nLen 是长度
@@ -94,6 +108,8 @@ void RTPDepacketizer ::processPop() {
 
                     // 直接推给 Audio Packet Queue
                     m_outputQueue->enqueue(move(packet));
+                    WRITE_LOG("pop a audio packet to decoder");
+                    
                 }
             }
         }
@@ -117,7 +133,7 @@ void RTPDepacketizer ::resetH264Assembler() {
     m_fuBuffer.clear();
 }
 
-// reassembleH264 实现见上一个回答，保持不变
+
 void RTPDepacketizer ::reassembleH264(const std::vector<uint8_t>& payload, uint32_t timestamp) {
     if (payload.empty()) return;
 
@@ -147,7 +163,7 @@ void RTPDepacketizer ::reassembleH264(const std::vector<uint8_t>& payload, uint3
 
         // 5. 入队
         m_outputQueue->enqueue(move(packet));
-
+        WRITE_LOG("pop a video packet to decoder (Single NAL Unit)");
         // 如果正在组装 FU-A 却来了个 Single NAL，说明之前的 FU-A 丢包了，重置状态
         m_isReassembling = false;
         m_fuBuffer.clear();
@@ -193,7 +209,7 @@ void RTPDepacketizer ::reassembleH264(const std::vector<uint8_t>& payload, uint3
                 packet->dts = timestamp;
 
                 m_outputQueue->enqueue(move(packet));
-
+                WRITE_LOG("pop a video packet to decoder (Fragmentation Unit)");
                 // 重置
                 m_fuBuffer.clear();
                 m_isReassembling = false;

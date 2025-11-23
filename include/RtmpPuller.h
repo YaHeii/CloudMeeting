@@ -5,7 +5,7 @@
 #include <QWaitCondition>
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
-#include "RtmpAudioPlayer.h"
+#include "AudioPlayer.h"
 #include "ffmpegVideoDecoder.h"
 #include "netheader.h"
 #include <QMessageBox>
@@ -52,7 +52,7 @@ private:
     QThread* m_videoDecodeThread = nullptr;
     ffmpegVideoDecoder* m_videoDecoder = nullptr;
     QThread* m_audioPlayThread = nullptr;
-    RtmpAudioPlayer* m_audioPlayer = nullptr;
+    AudioPlayer* m_audioPlayer = nullptr;
 
     // --- 线程同步 ---
     QMutex m_workMutex;

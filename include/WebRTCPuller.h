@@ -7,7 +7,7 @@
 #include <QWaitCondition>
 #include "ThreadSafeQueue.h"
 #include "AVSmartPtrs.h"
-#include "RtmpAudioPlayer.h"
+#include "AudioPlayer.h"
 #include "netheader.h"
 #include "ffmpegVideoDecoder.h"
 #include <QMessageBox>
@@ -31,8 +31,9 @@ public:
 private:
     void sendOfferToSignalingServer(const std::string& sdp);
 
-    void initCodecParams();
-
+    void initAudioCodecParams();
+    void initVideoCodecParams();
+    void initAudioParams();
     void stopPulling();
 
     RTPDepacketizer* m_videoDepacketizer;
@@ -71,7 +72,7 @@ private:
     QThread* m_videoDecodeThread = nullptr;
     ffmpegVideoDecoder* m_videoDecoder = nullptr;
     QThread* m_audioPlayThread = nullptr;
-    RtmpAudioPlayer* m_audioPlayer = nullptr;
+    AudioPlayer* m_audioPlayer = nullptr;
 
     // --- 线程同步 ---
     QMutex m_workMutex;
@@ -86,7 +87,7 @@ signals:
     void newFrameAvailable();
     void initSuccess();
 public slots:
-    bool init(QString WebRTCUrl);
+    bool init(QString WebRTCUrl, QString audioDeviceName);
     void clear();
     void startPulling(); 
     void onSignalingReply(QNetworkReply* response);
@@ -96,6 +97,5 @@ public slots:
 
     void onStreamOpened_initAudio(AVCodecParameters* aParams, AVRational aTimeBase);
 };
-
 
 #endif

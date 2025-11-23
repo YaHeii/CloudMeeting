@@ -37,7 +37,6 @@ private:
     std::atomic<bool> m_isDecoding = false;
     std::atomic<bool> m_isConfigReady = false;
 
-    // FFmpeg-related members
     AVCodecContext *m_codecCtx = nullptr;
     const AVCodec *m_codec = nullptr;
     SwrContext *m_swrCtx = nullptr; // 用于音频重采样

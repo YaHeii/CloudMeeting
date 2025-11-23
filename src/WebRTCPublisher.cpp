@@ -135,24 +135,24 @@ void WebRTCPublisher::initializePeerConnection() {
                 if (state == rtc::PeerConnection::State::Connected) {
                     emit publisherStarted();
                     onPLI_Received();
-                    if (m_pliTimer) {
-                        m_pliTimer->stop();
-                        m_pliTimer->deleteLater();
-                        m_pliTimer = nullptr;
-                    }
-                    m_pliTimer = new QTimer(this);
-                    connect(m_pliTimer, &QTimer::timeout, this, [this]() {
-                        static int count = 0;
-                        if (count++ < 30) {
-                            WRITE_LOG("WebRTC: Scheduled Keyframe Request (%d/5)", count);
-                            onPLI_Received();
-                        }
-                        else {
-                            m_pliTimer->stop();
-                            count = 0;
-                        }
-                        });
-                    m_pliTimer->start(1000);
+                    //if (m_pliTimer) {
+                    //    m_pliTimer->stop();
+                    //    m_pliTimer->deleteLater();
+                    //    m_pliTimer = nullptr;
+                    //}
+                    //m_pliTimer = new QTimer(this);
+                    //connect(m_pliTimer, &QTimer::timeout, this, [this]() {
+                    //    static int count = 0;
+                    //    if (count++ < 30) {
+                    //        WRITE_LOG("WebRTC: Scheduled Keyframe Request (%d/5)", count);
+                    //        onPLI_Received();
+                    //    }
+                    //    else {
+                    //        m_pliTimer->stop();
+                    //        count = 0;
+                    //    }
+                    //    });
+                    //m_pliTimer->start(1000);
                 }
                 else if (state == rtc::PeerConnection::State::Failed) {
                     emit errorOccurred("WebRTC connection failed.");
@@ -434,7 +434,7 @@ void WebRTCPublisher::clear() {
 }
 
 void WebRTCPublisher::onPLI_Received() {
-    WRITE_LOG("Libdatachannel onPLI callback!");
+    //WRITE_LOG("Libdatachannel onPLI callback!");
     // 跨线程安全地调用这个槽
     emit PLIReceived();
 }

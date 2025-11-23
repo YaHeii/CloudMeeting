@@ -1,7 +1,7 @@
 ﻿#include "RtmpPuller.h"
 #include "logqueue.h"
 #include "log_global.h"
-#include "RtmpAudioPlayer.h"
+#include "AudioPlayer.h"
 #include <QApplication>
 #include <QScreen>
 #include <QDebug>
@@ -18,7 +18,7 @@ RtmpPuller::RtmpPuller(QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue,
 											m_MainQimageQueue, // 使用外部 QImage 队列
 											m_dummyVideoFrameQueue);
 
-	m_audioPlayer = new RtmpAudioPlayer(m_audioPacketQueue);
+	m_audioPlayer = new AudioPlayer(m_audioPacketQueue);
 
 	m_videoDecodeThread = new QThread();
 	m_audioPlayThread = new QThread();
@@ -33,7 +33,7 @@ RtmpPuller::RtmpPuller(QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue,
 
 	// 转发错误信号
 	connect(m_videoDecoder, &ffmpegVideoDecoder::errorOccurred, this, &RtmpPuller::errorOccurred);
-	connect(m_audioPlayer, &RtmpAudioPlayer::errorOccurred, this, &RtmpPuller::errorOccurred);
+	connect(m_audioPlayer, &AudioPlayer::errorOccurred, this, &RtmpPuller::errorOccurred);
 	connect(m_videoDecoder, &ffmpegVideoDecoder::newFrameAvailable,this, &RtmpPuller::newFrameAvailable);
 	WRITE_LOG("RtmpPuller (Player Module) created.");
 }

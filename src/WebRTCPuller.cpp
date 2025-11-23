@@ -17,12 +17,15 @@ WebRTCPuller::WebRTCPuller(QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue
 	m_videoDecoder = new ffmpegVideoDecoder(m_videoPacketQueue,
 											m_MainQimageQueue, // 使用外部 QImage 队列
 											m_dummyVideoFrameQueue);
-	m_audioPlayer = new RtmpAudioPlayer(m_audioPacketQueue);
+	m_audioPlayer = new AudioPlayer(m_audioPacketQueue);
 
 	m_videoDecodeThread = new QThread();
 	m_audioPlayThread = new QThread();
 	m_videoDecoder->moveToThread(m_videoDecodeThread);
 	m_audioPlayer->moveToThread(m_audioPlayThread);
+    m_videoDecodeThread->start();
+    m_audioPlayThread->start();
+
 
 	connect(this, &WebRTCPuller::VideostreamOpened,
 		this, &WebRTCPuller::onStreamOpened_initVideo, Qt::QueuedConnection);
@@ -30,7 +33,7 @@ WebRTCPuller::WebRTCPuller(QUEUE_DATA<std::unique_ptr<QImage> >* MainQimageQueue
 		this, &WebRTCPuller::onStreamOpened_initAudio, Qt::QueuedConnection);
 
 	connect(m_videoDecoder, &ffmpegVideoDecoder::errorOccurred, this, &WebRTCPuller::errorOccurred);
-	connect(m_audioPlayer, &RtmpAudioPlayer::errorOccurred, this, &WebRTCPuller::errorOccurred);
+	connect(m_audioPlayer, &AudioPlayer::errorOccurred, this, &WebRTCPuller::errorOccurred);
 	connect(m_videoDecoder, &ffmpegVideoDecoder::newFrameAvailable, this, &WebRTCPuller::newFrameAvailable);
 	WRITE_LOG("WebRTCPuller (Player Module) created.");
 }
@@ -42,7 +45,7 @@ WebRTCPuller::~WebRTCPuller()
 }
 
 
-bool WebRTCPuller::init(QString WebRTCUrl) {
+bool WebRTCPuller::init(QString WebRTCUrl, QString audioDeviceName) {
 
 	WRITE_LOG("Initializing WebRTC Puller");
 
@@ -65,9 +68,10 @@ bool WebRTCPuller::init(QString WebRTCUrl) {
 	m_rtcConfig.mtu = 1500;
 	m_rtcConfig.portRangeBegin = 10000;
 	m_rtcConfig.portRangeEnd = 20000;
-    emit initSuccess();
-
-
+    if (m_audioPlayer) {
+        m_audioPlayer->setTargetDeviceName(audioDeviceName);
+    }
+    initializePeerConnection();
 	return true;
 }
 
@@ -86,7 +90,25 @@ void WebRTCPuller::initializePeerConnection()
         video.setDirection(rtc::Description::Direction::RecvOnly);
         m_videoTrack = m_peerConnection->addTrack(video);
         WRITE_LOG("Video RecvOnly track (H.264) added.");
+        m_videoTrack->onMessage([this](rtc::message_variant message) {
+            std::string trackType = m_videoTrack->description();
+            //WRITE_LOG("Stream Track Received! MID: %s", m_videoTrack->mid().c_str());
 
+            if (!m_isPulling) {
+                return;
+            }
+            if (!std::holds_alternative<rtc::binary>(message)) return;
+
+            auto& data_bin = std::get<rtc::binary>(message);
+            // data_bin 是 std::vector<byte> 或类似结构
+            if (m_videoDepacketizer) {
+                 WRITE_LOG("Video Packet Received size=%d", data_bin.size());
+                m_videoDepacketizer->pushPacket(
+                    reinterpret_cast<const uint8_t*>(data_bin.data()),
+                    data_bin.size()
+                );
+            }
+         });
 
         rtc::Description::Audio audio("audio");
         //rtc::Description::Audio audio("audio", rtc::Description::Direction::SendOnly);
@@ -96,46 +118,24 @@ void WebRTCPuller::initializePeerConnection()
         m_audioTrack = m_peerConnection->addTrack(audio);
         WRITE_LOG("Audio track (Opus) added.");
 
+        m_audioTrack->onMessage([this](rtc::message_variant message) {
+            std::string trackType = m_audioTrack->description();
+            //WRITE_LOG("Stream Track Received! MID: %s", m_audioTrack->mid().c_str());
 
-        m_peerConnection->onTrack([this](std::shared_ptr<rtc::Track> track) {
-            WRITE_LOG("Stream Track Received! MID: %s", track->mid().c_str());
-            std::string trackType = track->description();
-            bool isVideo = (trackType.find("video") != std::string::npos);
+            if (!m_isPulling) {
+                return;
+            }
+            if (!std::holds_alternative<rtc::binary>(message)) return;
 
-            // 绑定 RTP 数据回调
-            track->onMessage([this, isVideo](rtc::message_variant message) {
-                if (!m_isPulling) {
-                    return;
-                }
-                if (!std::holds_alternative<rtc::binary>(message)) return;
-
-                auto& data_bin = std::get<rtc::binary>(message);
-                // data_bin 是 std::vector<byte> 或类似结构
-
-                // 将 std::byte 转换为 uint8_t 指针
-                const uint8_t* data_ptr = reinterpret_cast<const uint8_t*>(data_bin.data());
-                size_t data_size = data_bin.size();
-
-                // 判断是视频还是音频
-                // 注意：实际判断通常基于 Description 或 SDP 协商结果，这里简单通过 mid 或 description 判断
-                if (isVideo) {
-                    // === 视频处理 ===
-                    // 直接推入解包器。
-                    // 解包器内部负责：JitterBuffer排序 -> 定时取包 -> FU-A重组 -> 加上00000001 -> 入队 m_videoPacketQueue
-                    if (m_videoDepacketizer) {
-                        m_videoDepacketizer->pushPacket(data_ptr, data_size);
-                    } else {
-                        WRITE_LOG("Video Depacketizer Failed.");
-                    }
-                } else {
-                    if (m_audioDepacketizer) {
-                        m_audioDepacketizer->pushPacket(data_ptr, data_size);
-                    } else {
-                        WRITE_LOG("Audio Depacketizer Failed.");
-                    }
-
-                }
-             });
+            auto& data_bin = std::get<rtc::binary>(message);
+            // data_bin 是 std::vector<byte> 或类似结构
+            if (m_audioDepacketizer) {
+                 WRITE_LOG("Audio Packet Received size=%d", data_bin.size());
+                m_audioDepacketizer->pushPacket(
+                    reinterpret_cast<const uint8_t*>(data_bin.data()),
+                    data_bin.size()
+                );
+            }
          });
         //// description回调
         m_peerConnection->onLocalDescription([this](const rtc::Description& description) {
@@ -160,8 +160,8 @@ void WebRTCPuller::initializePeerConnection()
              };
             WRITE_LOG("WebRTC PeerConnection state changed: %s", stateToString(state));
             if (state == rtc::PeerConnection::State::Connected) {
-                initCodecParams();
-                
+                initAudioCodecParams();
+                initVideoCodecParams();
             }
             else if (state == rtc::PeerConnection::State::Failed) {
                 emit errorOccurred("WebRTC connection failed.");
@@ -197,6 +197,7 @@ void WebRTCPuller::initializePeerConnection()
         });
         //完成回调后添加offer，防止竞态
         m_peerConnection->setLocalDescription();
+        emit initSuccess();
         WRITE_LOG("Local description set, waiting for ICE gathering...");
     }
     catch (const std::exception& e) {
@@ -319,7 +320,21 @@ void WebRTCPuller::onSignalingReply(QNetworkReply* response) {
 
 }
 
-void WebRTCPuller::initCodecParams() {
+void WebRTCPuller::initAudioCodecParams() {
+
+    m_aParams = avcodec_parameters_alloc();
+    m_aParams->codec_type = AVMEDIA_TYPE_AUDIO;
+    m_aParams->codec_id = AV_CODEC_ID_OPUS;
+    m_aParams->sample_rate = 48000;
+    m_aParams->ch_layout.nb_channels = 2; 
+
+    // RTP Opus 标准时基
+    m_aTimeBase = { 1, 48000 };
+
+    emit AudiostreamOpened(m_aParams, m_aTimeBase);
+
+}
+void WebRTCPuller::initVideoCodecParams() {
     // 1. 构造 Video Parameters (H.264)
     m_vParams = avcodec_parameters_alloc();
     m_vParams->codec_type = AVMEDIA_TYPE_VIDEO;
@@ -330,22 +345,8 @@ void WebRTCPuller::initCodecParams() {
 
     // RTP H.264 标准时基
     m_vTimeBase = { 1, 90000 };
-
-    // 2. 构造 Audio Parameters (Opus)
-    m_aParams = avcodec_parameters_alloc();
-    m_aParams->codec_type = AVMEDIA_TYPE_AUDIO;
-    m_aParams->codec_id = AV_CODEC_ID_OPUS;
-    m_aParams->sample_rate = 48000;
-    m_aParams->ch_layout.nb_channels = 2; 
-
-    // RTP Opus 标准时基
-    m_aTimeBase = { 1, 48000 };
-
     emit VideostreamOpened(m_vParams, m_vTimeBase);
-    emit AudiostreamOpened(m_aParams, m_aTimeBase);
-
 }
-
 
 void WebRTCPuller::onStreamOpened_initVideo(AVCodecParameters* vParams, AVRational vTimeBase) {
 
@@ -397,22 +398,13 @@ void WebRTCPuller::ChangePullingState(bool isPulling) {
 }
 
 void WebRTCPuller::startPulling() {
+    m_isPulling = true;
 
-	if (m_isPulling) {
-		WRITE_LOG("WebRTCPuller already pulling.");
-		return;
-	}
-	m_isPulling = true;
 	WRITE_LOG("WebRTCPuller: Starting all threads...");
-	m_videoDecodeThread->start();
-	m_audioPlayThread->start();
+
 }
 
 void WebRTCPuller::stopPulling() {
-	if (!m_isPulling) {
-		WRITE_LOG("WebRTCPuller already stopped.");
-		return;
-	}
 	m_isPulling = false;
 	WRITE_LOG("WebRTCPuller: Stopping all threads...");
 }
