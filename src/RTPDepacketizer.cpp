@@ -9,10 +9,16 @@ extern "C" {
 RTPDepacketizer::RTPDepacketizer(int sampleRate, QUEUE_DATA<AVPacketPtr>* outputQueue, bool isH264, QObject* parent)
     : QObject(parent), m_outputQueue(outputQueue),m_isH264(isH264)
 {
-    // 设定缓冲深度，例如 200ms。这决定了抗抖动能力和延迟。
-    m_jitterBuffer = new RTPJitter(200, sampleRate);
+    // 保存 sample rate，用于将 RTP timestamp 差值转换为毫秒
+    m_payloadSampleRate = sampleRate;
+    m_lastTimestamp = 0;
+    m_hasLastTimestamp = false;
+
+    // 设定缓冲深度，降低到 80ms 以减少首次进入 BUFFERING 的延迟
+    const unsigned nominalDepthMs = 80;
+    m_jitterBuffer = new RTPJitter(nominalDepthMs, sampleRate);
     if (m_jitterBuffer) {
-        WRITE_LOG("jitterBuffer init");
+        WRITE_LOG("jitterBuffer init (nominal=%d ms)", nominalDepthMs);
     }
     // 启动一个定时器来驱动数据 "流出"
     // Jitter Buffer 的核心是 "延时输出"，所以需要定时去取
@@ -32,7 +38,11 @@ RTPDepacketizer::~RTPDepacketizer() {
 
 // 【生产者】网络线程调用：推入数据
 void RTPDepacketizer::pushPacket(const uint8_t* data, size_t len) {
-
+    WRITE_LOG("push packet to jitterBuffer");
+    if (!data || len < sizeof(RTPHeader)) {
+        WRITE_LOG("pushPacket: invalid data or too short for RTP header (len=%d)", (int)len);
+        return;
+    }
     // 1. 封装成库需要的对象
     // 注意：RTPPacket 构造函数会发生一次内存拷贝，这是必要的
     rawrtp_ptr packet = std::make_shared<RTPPacket>((uint8_t*)data, len);
@@ -40,19 +50,45 @@ void RTPDepacketizer::pushPacket(const uint8_t* data, size_t len) {
         WRITE_LOG("Packetizer failed");
         return;
     }
-    // 2. 关键修正：设置 Payload 时间
-    // 该库依赖 payload_ms 计算缓冲区深度。
-    // H.264 一帧可能分很多包，单个包时间很难界定。
-    // 策略：简单给个 0 或 1，主要依赖库的 Timestamp 差值逻辑即可，
-    // 或者简单粗暴认为每个包代表 0ms (因为只是分片)，只有完整帧才有时间。
-    // 库源码中 _depth_ms 会累加这个值。为了避免 overflow 逻辑误判，建议设为 0。
-    packet->payload_ms = 0;
+
+    // 解析 RTP header 的 timestamp（用于估算 payload_ms）
+    uint32_t timestamp = 0;
+    RTPHeader* rtpHeader = reinterpret_cast<RTPHeader*>(packet->pData);
+    timestamp = ntohl(rtpHeader->timestamp);
+
+    uint32_t payload_ms = 0;
+    if (!m_hasLastTimestamp) {
+        m_hasLastTimestamp = true;
+        // 为了避免首次长时间 BUFFERING，给首包一个小的占位时间，等后续包会用 timestamp 差做精确计数
+        int nominal = 0;
+        if (m_jitterBuffer) nominal = m_jitterBuffer->get_nominal_depth();
+        payload_ms = (nominal > 0) ? static_cast<uint32_t>(nominal) : 20;
+    }
+    else {
+        uint32_t delta = timestamp - m_lastTimestamp; // 无符号处理 wrap
+        if (m_payloadSampleRate > 0) {
+            payload_ms = static_cast<uint32_t>((static_cast<uint64_t>(delta) * 1000ULL) / static_cast<uint64_t>(m_payloadSampleRate));
+            if (payload_ms > 10000) payload_ms = 10000;
+        } else {
+            payload_ms = 0;
+        }
+    }
+    m_lastTimestamp = timestamp;
+
+    // 关键：设置 Payload 时间，供 jitter buffer depth 计算使用。
+    packet->payload_ms = static_cast<uint16_t>(payload_ms);
+
     // 3. 推入 Jitter Buffer
     RTPJitter::RESULT  res = m_jitterBuffer->push(packet);
     if (res == RTPJitter::SUCCESS) {
-        WRITE_LOG("push packet in the jitterbuffer");
+        WRITE_LOG("push packet in the jitterbuffer (payload_ms=%d)", packet->payload_ms);
+    } else if (res == RTPJitter::BUFFER_OVERFLOW) {
+        WRITE_LOG("push packet failed: BUFFER_OVERFLOW (payload_ms=%d)", packet->payload_ms);
+    } else if (res == RTPJitter::BAD_PACKET) {
+        WRITE_LOG("push packet failed: BAD_PACKET (payload_ms=%d)", packet->payload_ms);
+    } else {
+        WRITE_LOG("push packet failed: result=%d (payload_ms=%d)", (int)res, packet->payload_ms);
     }
-
 }
 
 

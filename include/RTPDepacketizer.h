@@ -42,6 +42,11 @@ private:
     void resetH264Assembler();
 
     void reassembleH264(const std::vector<uint8_t>& payload, uint32_t timestamp);
+
+    // 新增：用于根据 RTP timestamp 计算 payload_ms
+    uint32_t m_payloadSampleRate = 0;   // 构造时传入（90000 或 48000）
+    uint32_t m_lastTimestamp = 0;
+    bool m_hasLastTimestamp = false;
 };
 
 #endif

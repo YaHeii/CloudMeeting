@@ -35,6 +35,10 @@
 #include "winsock2.h"
 #include <winsock.h>
 
+// logging
+#include "logqueue.h"
+#include "log_global.h"
+
 using namespace std;
 
 
@@ -64,7 +68,6 @@ RTPJitter::~RTPJitter()
 }
 
 
-
 /******************************************************************************
 *   Ensure a new empty buffer and associated parameters.  Reset buffer stats.
 *
@@ -88,7 +91,6 @@ void RTPJitter::init(const unsigned depth, const uint32 sample_rate /* = 8000 */
 }
 
 
-
 /******************************************************************************
 *   Adds the given packet to the end of the buffer, or inserts it earlier in
 *   the buffer if it is out of order.
@@ -110,6 +112,27 @@ RTPJitter::RESULT RTPJitter::push(rawrtp_ptr p)
 
         if (_depth_ms > _max_buffer_depth) {
             LOGD("RTPJitter::push(): buffer overflow: buffer depth: %d  packet #%d", _depth_ms, rtp_sequence);
+            if (!_buffer.empty()) {
+                rc = BUFFER_OVERFLOW;
+                _stats.overflow_count++;
+
+                // we are overflowing ... drop the front packet
+                rawrtp_ptr old_packet = _buffer.front();
+                _buffer.pop_front();
+
+                // 防止下溢：如果当前 depth 小于包的时间，直接归零
+                if (_depth_ms >= old_packet->payload_ms) {
+                    _depth_ms -= old_packet->payload_ms;
+                }
+                else {
+                    _depth_ms = 0;
+                }
+                old_packet.reset();
+            }
+            else {
+                // 队列为空但 depth 很大，说明状态已经错乱，强制重置
+                _depth_ms = 0;
+            }
             rc = BUFFER_OVERFLOW;
             _stats.overflow_count++;
 
@@ -179,6 +202,7 @@ RTPJitter::RESULT RTPJitter::push(rawrtp_ptr p)
             } else if (rtp_sequence == (_first_buf_sequence - 1)) {
                 _buffer.push_front(p);
                 _first_buf_sequence = rtp_sequence;
+                _depth_ms += p->payload_ms;
             } else {
                 // this packet has a sequence number that is strictly
                 //  less than the last packet in our buffer, and greater
@@ -188,11 +212,15 @@ RTPJitter::RESULT RTPJitter::push(rawrtp_ptr p)
                     RTPHeader *item = reinterpret_cast<PRTPHeader>((*i)->pData);
                     if (rtp_sequence < item->sequence) {
                         _buffer.insert(i, p);
+                        _depth_ms += p->payload_ms;
                         break;
                     }
                 }
             }
         }
+
+        // debug log
+        WRITE_LOG("RTPJitter::push seq=%u payload_ms=%u buffer_size=%d depth_ms=%d nominal=%d buffering=%d", rtp_sequence, p->payload_ms, (int)_buffer.size(), _depth_ms, _nominal_depth_ms, _buffering);
     } else {
         // we were given a null pointer ... is that bad enough?
         rc = BAD_PACKET;
@@ -240,6 +268,9 @@ RTPJitter::RESULT RTPJitter::pop(rawrtp_ptr& packet)
             {
                 _buffering = false;
                 _buffering_timestamp = (timepoint::min)();
+            } else {
+                // log buffering state
+                WRITE_LOG("RTPJitter::pop buffering buffer_time=%d depth_ms=%d nominal=%d buf_size=%d", buffer_time, _depth_ms, _nominal_depth_ms, (int)_buffer.size());
             }
         }
     }
@@ -289,6 +320,7 @@ RTPJitter::RESULT RTPJitter::pop(rawrtp_ptr& packet)
             p = reinterpret_cast<PRTPHeader>(bp->pData);
             _first_buf_sequence = ntohs(p->sequence);
         }
+        WRITE_LOG("RTPJitter::pop SUCCESS seq=%u depth_ms=%d buf_size=%d", ntohs(p->sequence), _depth_ms, (int)_buffer.size());
         return RTPJitter::SUCCESS;
 
     } else {
@@ -296,7 +328,6 @@ RTPJitter::RESULT RTPJitter::pop(rawrtp_ptr& packet)
         return RTPJitter::DROPPED_PACKET;
     }
 }
-
 
 
 /******************************************************************************
@@ -313,7 +344,6 @@ RTPJitter::RESULT RTPJitter::reset()
 
     return SUCCESS;
 }
-
 
 
 /******************************************************************************
@@ -336,7 +366,6 @@ void RTPJitter::set_depth(const unsigned ms_depth, const unsigned max_depth /* =
 }
 
 
-
 /******************************************************************************
 *   Rertieves the current number of packets in the buffer.
 ******************************************************************************/
@@ -345,7 +374,6 @@ int RTPJitter::get_depth()
     rscoped_lock lock(_mutex);
     return (_buffer.size());
 }
-
 
 
 /******************************************************************************
@@ -358,7 +386,6 @@ int RTPJitter::get_depth_ms()
 }
 
 
-
 /******************************************************************************
 *   Retrieves the current "requested/nominal" depth of the buffer in miliseconds.
 ******************************************************************************/
@@ -367,7 +394,6 @@ int RTPJitter::get_nominal_depth()
     rscoped_lock lock(_mutex);
     return _nominal_depth_ms;
 }
-
 
 
 /******************************************************************************
@@ -381,7 +407,6 @@ void RTPJitter::eot_detected()
     _last_buf_sequence = 0;
     _last_pop_sequence = 0;
 }
-
 
 
 /******************************************************************************
@@ -429,7 +454,6 @@ void RTPJitter::_calc_jitter(RTPHeader *rtp)
 }
 
 
-
 /******************************************************************************
 *   Clean items out of our buffer and delete/release memory resources.
 *
@@ -440,7 +464,6 @@ void RTPJitter::_clean_buffer()
     _buffer.clear();
     _depth_ms = 0;
 }
-
 
 
 /******************************************************************************
@@ -481,7 +504,6 @@ uint8 *RTPJitter::_get_payload(RTPHeader *packet)
 }
 
 
-
 /******************************************************************************
 *   Utility/convenience function to extract Payload Type from an RTP Header.
 ******************************************************************************/
@@ -496,7 +518,6 @@ uint8 RTPJitter::_get_payload_type(RTPHeader *packet)
 }
 
 
-
 /******************************************************************************
 *   Sends given string to stdout.
 *
@@ -506,7 +527,6 @@ void RTPJitter::_log(string s)
 {
    // cout << s << endl;
 }
-
 
 
 /******************************************************************************

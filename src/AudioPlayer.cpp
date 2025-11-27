@@ -7,6 +7,17 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+#include <QString>
+#include <QRegularExpression>
+
+static QString normalizeDeviceString(const QString& s) {
+    QString out = s;
+    // remove parentheses content like "麦克风 (Realtek(R) Audio)" -> "麦克风  "
+    out.remove(QRegularExpression("\\(.*\\)"));
+    out = out.trimmed().toLower();
+    return out;
+}
+
 AudioPlayer::AudioPlayer(QUEUE_DATA<AVPacketPtr>* packetQueue,
     QObject* parent)
     : QObject{ parent }, m_packetQueue(packetQueue) {
@@ -79,14 +90,14 @@ bool AudioPlayer::init(AVCodecParameters* params, AVRational inputTimeBase) {
     format.setSampleRate(m_ResampleConfig.sample_rate);
     format.setChannelCount(m_ResampleConfig.ch_layout.nb_channels);
     format.setSampleFormat(QAudioFormat::Int16); // 对应 AV_SAMPLE_FMT_S16
-    if(m_audioDeviceName == nullptr) return false;
+    if(m_audioDeviceName.isEmpty()) return false;
     const QAudioDevice& targetDevice = findDeviceByName(m_audioDeviceName);
     m_audioSink = new QAudioSink(targetDevice, format, this);
     // 缓冲 200ms
     m_audioSink->setBufferSize(m_ResampleConfig.sample_rate * 2 * 2 * 0.2); 
 
     m_audioIO = m_audioSink->start();
-    if (!m_audioDevice) {
+    if (!m_audioIO) {
         emit errorOccurred("AudioPlayer: Failed to start QAudioSink.");
         return false;
     }
@@ -96,16 +107,41 @@ bool AudioPlayer::init(AVCodecParameters* params, AVRational inputTimeBase) {
     return true;
 }
 
-QAudioDevice AudioPlayer::findDeviceByName(QString& name) {
+QAudioDevice AudioPlayer::findDeviceByName(const QString& name) {
+    // Log available devices to help debugging
+    const auto devices = QMediaDevices::audioOutputs();
+    WRITE_LOG("Available QAudioDevices:");
+    for (const auto &d : devices) {
+        WRITE_LOG("  id='%s' desc='%s'", d.id().constData(), d.description().toUtf8().constData());
+    }
+
     if (name.isEmpty()) return QMediaDevices::defaultAudioOutput();
 
-    const auto devices = QMediaDevices::audioOutputs();
+    // 1) exact id match
     for (const auto& device : devices) {
-        if (device.description() == name) {
-            return device;
-        }
+        if (device.id() == name) return device;
     }
-    WRITE_LOG("Warning: Audio device '%s' not found, using default.", name.toStdString().c_str());
+
+    // 2) exact description match
+    for (const auto& device : devices) {
+        if (device.description() == name) return device;
+    }
+
+    // 3) fuzzy contains (both directions, case-insensitive)
+    QString target = name.toLower();
+    for (const auto& device : devices) {
+        QString desc = device.description().toLower();
+        if (desc.contains(target) || target.contains(desc)) return device;
+    }
+
+    // 4) normalized comparison (remove parentheses content, trim)
+    QString normTarget = normalizeDeviceString(name);
+    for (const auto& device : devices) {
+        QString normDesc = normalizeDeviceString(device.description());
+        if (!normTarget.isEmpty() && normTarget == normDesc) return device;
+    }
+
+    WRITE_LOG("Warning: Audio device '%s' not found, using default.", name.toUtf8().constData());
     return QMediaDevices::defaultAudioOutput();
 }
 

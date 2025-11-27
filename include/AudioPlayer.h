@@ -30,7 +30,7 @@ signals:
     void errorOccurred(const QString& errorText);
 
 public slots:
-    void setTargetDeviceName(QString& name) { m_audioDeviceName = name; }
+    void setTargetDeviceName(const QString& name) { m_audioDeviceName = name; }
     bool init(AVCodecParameters* params, AVRational inputTimeBase);
     void startPlaying();
     void stopPlaying();
@@ -57,8 +57,8 @@ private:
 
     QAudioSink* m_audioSink = nullptr;
     QIODevice* m_audioDevice = nullptr;
-    QString m_audioDeviceName = nullptr;
-    QAudioDevice findDeviceByName(QString& name); // 辅助函数
+    QString m_audioDeviceName; // default empty string
+    QAudioDevice findDeviceByName(const QString& name); // 查找回放设备
     QIODevice* m_audioIO = nullptr;
     uint8_t** m_resampledData = nullptr;
     int m_resampledDataSize = 0;
